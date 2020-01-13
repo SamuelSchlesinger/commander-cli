@@ -1,3 +1,8 @@
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -13,21 +18,24 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
-module Control.Commander where
+module Options.Commander where
 
 import Control.Applicative (Alternative(..))
+import Control.Monad ((<=<))
 import Control.Monad (ap, void)
 import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
-import Data.HashSet as HashSet
 import Data.HashMap.Strict as HashMap
+import Data.HashSet as HashSet
+import Data.Int
 import Data.Proxy (Proxy(..))
-import Data.Text (Text, pack, unpack)
-import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
-import System.Environment (getArgs)
+import Data.Text (Text, pack, unpack, stripPrefix, find)
 import Data.Text.Read (decimal, signed)
+import Data.Word
+import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+import Numeric.Natural
+import System.Environment (getArgs)
 
--- | A class for interpreting arguments, options, and flags into Haskell
--- types.
+-- | A class for interpreting command line arguments into Haskell types.
 class Unrender t where
   unrender :: Text -> Maybe t
 
@@ -37,23 +45,60 @@ instance Unrender String where
 instance Unrender Text where
   unrender = Just
 
+-- | A useful default unrender for small, bounded data types.
+unrenderSmall :: (Enum a, Bounded a, Show a) => Text -> Maybe a
+unrenderSmall = flip Prelude.lookup [(pack $ show x, x) | x <- [minBound..maxBound]]
+
+instance Unrender () where
+  unrender = unrenderSmall
+
+instance Unrender a => Unrender (Maybe a) where
+  unrender x = justCase x <|> nothingCase x where
+    justCase x = do
+      x' <- stripPrefix "Just " x
+      return (unrender x')
+    nothingCase x = if x == "Nothing" then return Nothing else Nothing
+
+instance (Unrender a, Unrender b) => Unrender (Either a b) where
+  unrender x = leftCase x <|> rightCase x where
+    leftCase  = fmap Left  . unrender <=< stripPrefix "Left "
+    rightCase = fmap Right . unrender <=< stripPrefix "Right "
+
 instance Unrender Bool where
-  unrender = flip Prelude.lookup [("True", True), ("False", False)]
+  unrender = unrenderSmall
 
-instance Unrender Integer where
+newtype WrappedIntegral i = WrappedIntegral { unwrapIntegral :: i }
+  deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
+
+instance Integral i => Unrender (WrappedIntegral i) where
   unrender = either (const Nothing) h . signed decimal where
-    h (n, "") = Just n
+    h (n, "") = Just (fromInteger n)
     h _ = Nothing
 
-instance Unrender Int where
-  unrender = either (const Nothing) h . signed decimal where
-    h (n, "") = Just n
-    h _ = Nothing
+deriving via WrappedIntegral Integer instance Unrender Integer
+deriving via WrappedIntegral Int instance Unrender Int
+deriving via WrappedIntegral Int8 instance Unrender Int8
+deriving via WrappedIntegral Int16 instance Unrender Int16
+deriving via WrappedIntegral Int32 instance Unrender Int32
+deriving via WrappedIntegral Int64 instance Unrender Int64
 
-instance Unrender Word where
+newtype WrappedNatural i = WrappedNatural { unwrapNatural :: i }
+  deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
+
+instance Integral i => Unrender (WrappedNatural i) where
   unrender = either (const Nothing) h . decimal where
-    h (n, "") = Just n
-    h _ = Nothing
+    h (n, "") = if n >= 0 then Just (fromInteger n) else Nothing
+    h _ = Nothing 
+
+deriving via WrappedNatural Natural instance Unrender Natural
+deriving via WrappedNatural Word instance Unrender Word
+deriving via WrappedNatural Word8 instance Unrender Word8
+deriving via WrappedNatural Word16 instance Unrender Word16
+deriving via WrappedNatural Word32 instance Unrender Word32
+deriving via WrappedNatural Word64 instance Unrender Word64
+
+instance Unrender Char where
+  unrender = find (const True)
 
 data Arg :: Symbol -> * -> *
 
@@ -74,8 +119,8 @@ data a + b
 infixr 2 +
 
 -- | A 'CommanderT' action is a metaphor for a military commander. At each
--- step, we can either have a plan, or a new 'Action' to take, or we can
--- have 'Defeat', or we can see 'Victory'. While a real life commander
+-- step, we have a new 'Action' to take, or we could have experienced
+-- 'Defeat', or we can see 'Victory'. While a real life commander
 -- worries about moving his troops around in order to achieve a victory in
 -- battle, a 'CommanderT' worries about iteratively transforming a state 
 -- to find some value. We will deal with the subset of these actions where
@@ -196,6 +241,14 @@ data State = State
   { arguments :: [Text]
   , options :: HashMap Text Text
   , flags :: HashSet Text }
+
+data CommandLineProgram
+  = Argument String CommandLineProgram String
+  | Option String String CommandLineProgram String
+  | Flag String CommandLineProgram String
+  | Subs [CommandLineProgram] String
+  | Usage String
+  | Named String CommandLineProgram String
 
 -- | This is the workhorse of the library and is inspired by the servant
 -- HTTP library. Basically, it allows you to 'run' your 'ProgramT'
