@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -19,6 +20,21 @@ import Text.Read
 import System.Exit
 import Data.Either
 
+type TaskManager
+  = Named "task-manager" & ( 
+    "help" & Usage (Named "task-manager" & TaskManagerBasic)
+  + TaskManagerBasic)
+
+type TaskManagerBasic
+  = "edit"       & TaskProgram
+  + "open"       & TaskProgram
+  + "close"      & TaskProgram
+  + "tasks"      & Raw
+  + "priorities" & Raw
+
+type TaskProgram = Arg "task-name" String & Raw
+  
+taskManager :: ProgramT TaskManager IO ()
 taskManager = toplevel @"task-manager" 
   $   sub @"edit" editTask 
   :+: sub @"open" newTask 
@@ -92,14 +108,16 @@ writeTask Task{name, priorities} = do
 renderPriorities :: [(String, String)] -> String
 renderPriorities = concat . map (\(x, y) -> ("#" ++ x ++ "\n" ++ unlines (map ("  " ++) $ lines y)))
 
+trimWhitespace :: String -> String
 trimWhitespace = reverse . dropWhile (== ' ') . reverse . dropWhile (== ' ')
 
 parseTask :: String -> String -> Maybe Task
 parseTask taskName
-  = sectionByPriority . map (\case
+  = sectionByPriority
+      . dropWhile isRight
+      . map (\case
       ('#': (trimWhitespace -> xs)) -> Left xs
-      xs -> Right xs) 
-      . dropWhile (== [])
+      xs -> Right xs)
       . lines
     where
       sectionByPriority :: [Either String String] -> Maybe Task
@@ -121,13 +139,11 @@ withTask taskName action = do
         Nothing -> action c Nothing
     else putStrLn $ "task " ++ taskName ++ " does not exist."
 
-dropExtension = takeWhile (/= '.')
-
 initializeOrFetch = do
   home <- getHomeDirectory >>= makeAbsolute
   withCurrentDirectory home $ do
     doesDirectoryExist "tasks" >>= \case
-      True -> Context home . map dropExtension . filter (".task" `isSuffixOf`) <$> listDirectory "tasks"
+      True -> Context home . map (takeWhile (/= '.')) . filter (".task" `isSuffixOf`) <$> listDirectory "tasks"
       False -> Context home [] <$ createDirectory "tasks"
   
 main = command_ taskManager
