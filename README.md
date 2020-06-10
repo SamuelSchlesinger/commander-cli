@@ -1,6 +1,6 @@
-# Commander
+# commander-cli
 
-The commander package contains two DSLs for describing command line programs, 
+The commander-cli package contains two DSLs for describing command line programs, 
 one at the type level and one at the term level. The one at the type level looks 
 like this:
 
