@@ -18,7 +18,62 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
-module Options.Commander where
+{- |
+Module: Options.Commander
+Description: A set of combinators for constructing and executing command line programs
+Copyright: (c) Samuel Schlesinger 2020
+License: MIT
+Maintainer: sgschlesinger@gmail.com
+Stability: experimental
+Portability: POSIX, Windows
+
+Commander is an embedded domain specific language describing a command line
+interface, along with ways to run those as real programs. An complete example
+of such a command line interface can be found as:
+
+@
+main :: IO ()
+main = command_ . toplevel @"file" $
+ (sub @"maybe-read" $
+  arg @"filename" \filename ->
+  flag @"read" \b -> raw $
+    if b
+      then putStrLn =<< readFile filename
+      else pure ())
+  \<+\>
+ (sub @"maybe-write" $
+  opt @"file" @"file-to-write" \mfilename -> raw $
+    case mfilename of
+      Just filename -> putStrLn =<< readFile filename
+      Nothing -> pure ())
+@
+
+The point of this library is mainly so that you can write command line
+interfaces quickly and easily, and not have to write any boilerplate.
+-}
+module Options.Commander (
+  -- ** Run CLI Programs
+  command, command_,
+  -- ** CLI Combinators
+  arg, opt, raw, sub, named, flag, toplevel, usage, (<+>),
+  -- ** Type Level CLI Description
+  type (&), type (+), Arg, Opt, Named, Usage, Raw, Flag,
+  -- **
+  HasProgram(run, hoist, invocations),
+  ProgramT(ArgProgramT, unArgProgramT,
+           OptProgramT, unOptProgramT,
+           RawProgramT, unRawProgramT,
+           SubProgramT, unSubProgramT,
+           NamedProgramT, unNamedProgramT,
+           FlagProgramT, unFlagProgramT,
+           UsageProgramT,
+           (:+:)
+           ),
+  -- ** The CommanderT Monad
+  CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
+  -- ** Parsing Arguments and Options
+  Unrender(unrender),
+) where
 
 import Control.Applicative (Alternative(..))
 import Control.Monad ((<=<))
@@ -67,7 +122,7 @@ instance (Unrender a, Unrender b) => Unrender (Either a b) where
 instance Unrender Bool where
   unrender = unrenderSmall
 
-newtype WrappedIntegral i = WrappedIntegral { unwrapIntegral :: i }
+newtype WrappedIntegral i = WrappedIntegral i
   deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
 
 instance Integral i => Unrender (WrappedIntegral i) where
@@ -82,7 +137,7 @@ deriving via WrappedIntegral Int16 instance Unrender Int16
 deriving via WrappedIntegral Int32 instance Unrender Int32
 deriving via WrappedIntegral Int64 instance Unrender Int64
 
-newtype WrappedNatural i = WrappedNatural { unwrapNatural :: i }
+newtype WrappedNatural i = WrappedNatural i
   deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
 
 instance Integral i => Unrender (WrappedNatural i) where
@@ -100,21 +155,41 @@ deriving via WrappedNatural Word64 instance Unrender Word64
 instance Unrender Char where
   unrender = find (const True)
 
+-- | The type level argument combinator, with a 'Symbol' designating the
+-- name of that argument.
 data Arg :: Symbol -> * -> *
 
+-- | The type level option combinator, with a 'Symbol' designating the
+-- option's name and another representing the metavariables name for
+-- documentation purposes.
 data Opt :: Symbol -> Symbol -> * -> *
 
+-- | The type level naming combinator, giving your program a name for the
+-- sake of documentation.
 data Named :: Symbol -> *
 
+-- | The type level usage combinator, taking a program type as an argument
+-- and being interpreted as a program which prints out all of the
+-- invocations of that particular program.
 data Usage :: * -> *
 
+-- | The type level program sequencing combinator, taking two program types
+-- and sequencing them one after another.
 data (&) :: k -> * -> *
 infixr 4 &
 
+-- | The type level raw monadic program combinator, allowing a command line
+-- program to just do some computation.
 data Raw :: *
 
+-- | The type level flag combinator, taking a name as input, allowing your
+-- program to take flags with the syntax @~flag@.
 data Flag :: Symbol -> *
 
+-- | The type level combining combinator, taking two program types as
+-- input, and being interpreted as a program which attempts to run the
+-- first command line program and, if parsing its flags, subprograms,
+-- options or arguments fails, runs the second, otherwise failing.
 data a + b
 infixr 2 +
 
@@ -237,28 +312,26 @@ instance Monad m => Alternative (CommanderT state m) where
     (action', state') <- action state 
     return (action' <|> p, state')
 
+-- | This is the 'State' that the 'CommanderT' library uses for its role in
+-- this library. It is not inlined, because that does nothing but obfuscate
+-- the 'CommanderT' monad. It consists of 'arguments', 'options', and
+-- 'flags'.
 data State = State 
   { arguments :: [Text]
   , options :: HashMap Text Text
   , flags :: HashSet Text }
 
-data CommandLineProgram
-  = Argument String CommandLineProgram String
-  | Option String String CommandLineProgram String
-  | Flag String CommandLineProgram String
-  | Subs [CommandLineProgram] String
-  | Usage String
-  | Named String CommandLineProgram String
-
--- | This is the workhorse of the library and is inspired by the servant
--- HTTP library. Basically, it allows you to 'run' your 'ProgramT'
+-- | This is the workhorse of the library. Basically, it allows you to 
+-- 'run' your 'ProgramT'
 -- representation of your program as a 'CommanderT' and pump the 'State'
 -- through it until you've processed all of the arguments, options, and
 -- flags that you have specified must be used in your 'ProgramT'. You can
 -- think of 'ProgramT' as a useful syntax for command line programs, but
 -- 'CommanderT' as the semantics of that program. We also give the ability
 -- to 'hoist' 'ProgramT' actions between monads if you can uniformly turn
--- computations in one into another.
+-- computations in one into another. All of the different 'invocations'
+-- are also stored to give a primitive form of automatically generated
+-- documentation.
 class HasProgram p where
   data ProgramT p (m :: * -> *) a
   run :: ProgramT p IO a -> CommanderT State IO a
@@ -327,21 +400,21 @@ instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
   hoist n = NamedProgramT . hoist n . unNamedProgramT
   invocations = [((pack (symbolVal (Proxy @name)) <> " ") <>)] <*> invocations @p
 
-instance (KnownSymbol seg, HasProgram p) => HasProgram (seg & p) where
-  newtype ProgramT (seg & p) m a = SegProgramT { unSegProgramT :: ProgramT p m a }
+instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
+  newtype ProgramT (sub & p) m a = SubProgramT { unSubProgramT :: ProgramT p m a }
   run s = Action $ \State{..} -> do 
     case arguments of
       (x : xs) -> 
-        if x == pack (symbolVal $ Proxy @seg) 
-          then return (run $ unSegProgramT s, State{arguments = xs, ..})
+        if x == pack (symbolVal $ Proxy @sub) 
+          then return (run $ unSubProgramT s, State{arguments = xs, ..})
           else return (Defeat, State{..})
       [] -> return (Defeat, State{..})
-  hoist n = SegProgramT . hoist n . unSegProgramT
-  invocations = [((pack $ symbolVal (Proxy @seg) <> " ") <> )] 
+  hoist n = SubProgramT . hoist n . unSubProgramT
+  invocations = [((pack $ symbolVal (Proxy @sub) <> " ") <> )] 
             <*> invocations @p
 
 -- | A simple default for getting out the arguments, options, and flags
--- using 'System.Environment'. We use the syntax ~flag for flags and ~opt
+-- using 'getArgs'. We use the syntax ~flag for flags and ~opt
 -- for options, with arguments using the typical ordered representation.
 initialState :: IO State
 initialState = do
@@ -394,7 +467,7 @@ raw = RawProgramT
 sub :: KnownSymbol s 
     => ProgramT p m a 
     -> ProgramT (s & p) m a
-sub = SegProgramT
+sub = SubProgramT
 
 -- | Named command combinator, should only really be used at the top level.
 named :: KnownSymbol s 
@@ -414,6 +487,13 @@ toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m)
          => ProgramT p m a 
          -> ProgramT (Named s & ("help" & Usage (Named s & p) + p)) m a
 toplevel p = named (sub usage :+: p) where
+
+-- | The command line program which consists of trying to enter one and
+-- then trying the other.
+(<+>) :: forall x y m a. ProgramT x m a -> ProgramT y m a -> ProgramT (x + y) m a
+(<+>) = (:+:)
+
+infixr 2 <+>
 
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.

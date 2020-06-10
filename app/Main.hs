@@ -37,10 +37,10 @@ type TaskProgram = Arg "task-name" String & Raw
 taskManager :: ProgramT TaskManager IO ()
 taskManager = toplevel @"task-manager" 
   $   sub @"edit" editTask 
-  :+: sub @"open" newTask 
-  :+: sub @"close" closeTask 
-  :+: sub @"tasks" listTasks
-  :+: sub @"priorities" listPriorities
+  <+> sub @"open" newTask 
+  <+> sub @"close" closeTask 
+  <+> sub @"tasks" listTasks
+  <+> sub @"priorities" listPriorities
 
 editTask = arg @"task-name" \taskName -> raw 
   $ withTask taskName \Context{home} task -> callProcess "vim" [home ++ "/tasks/" ++ taskName ++ ".task"]
