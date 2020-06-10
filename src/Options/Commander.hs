@@ -54,10 +54,10 @@ instance Unrender () where
 
 instance Unrender a => Unrender (Maybe a) where
   unrender x = justCase x <|> nothingCase x where
-    justCase x = do
-      x' <- stripPrefix "Just " x
-      return (unrender x')
-    nothingCase x = if x == "Nothing" then return Nothing else Nothing
+    justCase x' = do
+      x'' <- stripPrefix "Just " x'
+      return (unrender x'')
+    nothingCase x' = if x' == "Nothing" then return Nothing else Nothing
 
 instance (Unrender a, Unrender b) => Unrender (Either a b) where
   unrender x = leftCase x <|> rightCase x where

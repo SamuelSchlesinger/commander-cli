@@ -43,5 +43,3 @@ flagProg = flag (raw . pure)
 
 flagTest :: IO ()
 flagTest = maybe exitFailure (cond exitSuccess exitFailure) =<< runCommanderT (run flagProg) (State mempty mempty (HashSet.fromList ["flag"]))
-
-
