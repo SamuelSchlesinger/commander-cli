@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                commander-cli
-version:             0.2.0.0
+version:             0.2.0.1
 synopsis:            A command line argument/option parser library built around a monadic metaphor
 description:         A command line argument/option parser library built around a monadic metaphor.
 homepage:            https://github.com/SamuelSchlesinger/commander-cli
@@ -55,7 +55,7 @@ executable task-manager
                        TypeApplications,
                        TypeOperators,
                        BlockArguments
-  build-depends:       base >=4.13 && < 5,
+  build-depends:       base >=4.12 && < 5,
                        mtl >=2.2,
                        text >=1.2.4 && < 1.3,
                        directory >= 1.3 && < 1.4,
@@ -67,7 +67,7 @@ executable task-manager
 test-suite test-commander
   type:                exitcode-stdio-1.0
   main-is:             Test.hs
-  build-depends:       base >= 4.13 && < 5,
+  build-depends:       base >= 4.12 && < 5,
                        text >=1.2.4 && < 1.3,
                        unordered-containers >= 0.2 && < 0.3,
                        commander-cli
