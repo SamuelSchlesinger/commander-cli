@@ -17,6 +17,7 @@ extra-source-files:  CHANGELOG.md, README.md
 library
   exposed-modules:     Options.Commander
   other-extensions:    ViewPatterns,
+                       DerivingVia,
                        StandaloneDeriving,
                        GeneralizedNewtypeDeriving,
                        DerivingStrategies,
