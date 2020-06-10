@@ -54,9 +54,9 @@ module Options.Commander (
   -- ** Run CLI Programs
   command, command_,
   -- ** CLI Combinators
-  arg, opt, raw, sub, named, flag, toplevel, usage, (<+>),
+  arg, opt, raw, sub, named, flag, toplevel, (<+>), usage,
   -- ** Type Level CLI Description
-  type (&), type (+), Arg, Opt, Named, Usage, Raw, Flag,
+  type (&), type (+), Arg, Opt, Named, Raw, Flag,
   -- **
   HasProgram(run, hoist, invocations),
   ProgramT(ArgProgramT, unArgProgramT,
@@ -65,7 +65,6 @@ module Options.Commander (
            SubProgramT, unSubProgramT,
            NamedProgramT, unNamedProgramT,
            FlagProgramT, unFlagProgramT,
-           UsageProgramT,
            (:+:)
            ),
   -- ** The CommanderT Monad
@@ -166,11 +165,6 @@ data Opt :: Symbol -> Symbol -> * -> *
 -- | The type level naming combinator, giving your program a name for the
 -- sake of documentation.
 data Named :: Symbol -> *
-
--- | The type level usage combinator, taking a program type as an argument
--- and being interpreted as a program which prints out all of the
--- invocations of that particular program.
-data Usage :: * -> *
 
 -- | The type level program sequencing combinator, taking two program types
 -- and sequencing them one after another.
@@ -363,15 +357,6 @@ instance HasProgram Raw where
   hoist n (RawProgramT m) = RawProgramT (n m)
   invocations = [mempty]
 
-instance HasProgram p => HasProgram (Usage p) where
-  data ProgramT (Usage p) m a = UsageProgramT
-  run _ = Action $ \s -> do
-    liftIO $ do
-      putStrLn "usage:"
-      void . traverse (putStrLn . unpack) $ invocations @p
-    return (Defeat, s)
-  hoist _ _ = UsageProgramT
-  invocations = [mempty]
 
 instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => HasProgram (Opt option name t & p) where
   newtype ProgramT (Opt option name t & p) m a = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m a }
@@ -483,9 +468,9 @@ flag = FlagProgramT
 -- | A convenience combinator that constructs the program I often want
 -- to run out of a program I want to write.
 toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m) 
-         => ProgramT p m a 
-         -> ProgramT (Named s & ("help" & Usage (Named s & p) + p)) m a
-toplevel p = named (sub usage :+: p) where
+         => ProgramT p m () 
+         -> ProgramT (Named s & ("help" & Raw + p)) m ()
+toplevel p = named (sub (usage @(Named s & (p + "help" & Raw))) <+> p)
 
 -- | The command line program which consists of trying to enter one and
 -- then trying the other.
@@ -496,5 +481,7 @@ infixr 2 <+>
 
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.
-usage :: HasProgram p => ProgramT (Usage p) m a
-usage = UsageProgramT
+usage :: forall p m a. (MonadIO m, HasProgram p) => ProgramT Raw m ()
+usage = raw $ do
+  liftIO $ putStrLn "usage:"
+  void . traverse (liftIO . putStrLn . unpack) $ invocations @p

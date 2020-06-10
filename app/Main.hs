@@ -20,16 +20,14 @@ import System.Exit
 import Data.Either
 
 type TaskManager
-  = Named "task-manager" & ( 
-    "help" & Usage (Named "task-manager" & TaskManagerBasic)
-  + TaskManagerBasic)
-
-type TaskManagerBasic
-  = "edit"       & TaskProgram
+  = Named "task-manager" &
+  ( "help"       & Raw
+  + "edit"       & TaskProgram
   + "open"       & TaskProgram
   + "close"      & TaskProgram
   + "tasks"      & Raw
   + "priorities" & Raw
+  )
 
 type TaskProgram = Arg "task-name" String & Raw
   
