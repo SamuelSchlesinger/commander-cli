@@ -11,7 +11,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PolyKinds #-}
@@ -225,12 +224,12 @@ instance (Monad m) => Applicative (CommanderT state m) where
   pure = Victory
 
 instance MonadTrans (CommanderT state) where
-  lift ma = Action \state -> do
+  lift ma = Action $ \state -> do
     a <- ma
     return (pure a, state)
 
 instance MonadIO m => MonadIO (CommanderT state m) where
-  liftIO ma = Action \state -> do
+  liftIO ma = Action $ \state -> do
     a <- liftIO ma
     return (pure a, state)
 
@@ -246,7 +245,7 @@ instance MonadIO m => MonadIO (CommanderT state m) where
 --   Case 2: Victory a >>= return 
 --         = Victory a
 --   Case 3: Action action >>= return
---         = Action \state -> do
+--         = Action $ \state -> do
 --             (action', state') <- action state
 --             return (action' >>= return, state')
 --
@@ -261,10 +260,10 @@ instance MonadIO m => MonadIO (CommanderT state m) where
 --          = k a >>= f
 --          = (Victory a >>= k) >>= f
 --    Case 3: Action action >>= (\x -> k x >>= h)
---          = Action \state -> do
+--          = Action $ \state -> do
 --              (action', state') <- action state
 --              return (action' >>= (\x -> k x >>= h), state')
---          = Action \state -> do
+--          = Action $ \state -> do
 --              (action', state') <- action state
 --              return ((action' >>= k) >>= h, state') -- by IH
 --    On the other hand,
@@ -272,7 +271,7 @@ instance MonadIO m => MonadIO (CommanderT state m) where
 --          = Action (\state -> do
 --              (action', state') <- action state
 --              return (action' >>= k, state') >>= h
---          = Action \state -> do
+--          = Action $ \state -> do
 --              (action', state') <- action state
 --              return ((action' >>= k) >>= h, state')
 --               
@@ -300,7 +299,7 @@ instance MonadIO m => MonadIO (CommanderT state m) where
 instance Monad m => Monad (CommanderT state m) where
   Defeat >>= _ = Defeat
   Victory a >>= f = f a
-  Action action >>= f = Action \state -> do
+  Action action >>= f = Action $ \state -> do
     (action', state') <- action state
     return (action' >>= f, state')
 
@@ -308,7 +307,7 @@ instance Monad m => Alternative (CommanderT state m) where
   empty = Defeat 
   Defeat <|> a = a 
   v@(Victory _) <|> _ = v
-  Action action <|> p = Action \state -> do
+  Action action <|> p = Action $ \state -> do
     (action', state') <- action state 
     return (action' <|> p, state')
 
@@ -366,7 +365,7 @@ instance HasProgram Raw where
 
 instance HasProgram p => HasProgram (Usage p) where
   data ProgramT (Usage p) m a = UsageProgramT
-  run _ = Action \s -> do
+  run _ = Action $ \s -> do
     liftIO $ do
       putStrLn "usage:"
       void . traverse (putStrLn . unpack) $ invocations @p

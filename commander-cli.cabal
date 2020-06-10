@@ -17,7 +17,6 @@ extra-source-files:  CHANGELOG.md, README.md
 library
   exposed-modules:     Options.Commander
   other-extensions:    ViewPatterns,
-                       DerivingVia,
                        StandaloneDeriving,
                        GeneralizedNewtypeDeriving,
                        DerivingStrategies,
@@ -29,7 +28,6 @@ library
                        RecordWildCards,
                        TypeApplications,
                        RankNTypes,
-                       BlockArguments,
                        DeriveFunctor,
                        AllowAmbiguousTypes,
                        PolyKinds,
@@ -53,8 +51,7 @@ executable task-manager
                        LambdaCase,
                        DataKinds,
                        TypeApplications,
-                       TypeOperators,
-                       BlockArguments
+                       TypeOperators
   build-depends:       base >=4.12 && < 5,
                        mtl >=2.2,
                        text >=1.2.4 && < 1.3,

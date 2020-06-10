@@ -7,7 +7,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE BlockArguments #-}
 module Main where
 
 import Control.Monad
@@ -42,10 +41,10 @@ taskManager = toplevel @"task-manager"
   <+> sub @"tasks" listTasks
   <+> sub @"priorities" listPriorities
 
-editTask = arg @"task-name" \taskName -> raw 
-  $ withTask taskName \Context{home} task -> callProcess "vim" [home ++ "/tasks/" ++ taskName ++ ".task"]
+editTask = arg @"task-name" $ \taskName -> raw 
+  $ withTask taskName $ \Context{home} task -> callProcess "vim" [home ++ "/tasks/" ++ taskName ++ ".task"]
 
-newTask = arg @"task-name" \taskName -> raw do
+newTask = arg @"task-name" $ \taskName -> raw $ do
   Context{home, tasks} <- initializeOrFetch
   if not (taskName `elem` tasks)
     then do
@@ -55,8 +54,8 @@ newTask = arg @"task-name" \taskName -> raw do
       callProcess "vim" [path]
     else putStrLn $ "task " ++ taskName ++ " already exists."
 
-closeTask = arg @"task-name" \taskName -> raw 
-  $ withTask taskName \Context{home, tasks} mtask ->
+closeTask = arg @"task-name" $ \taskName -> raw 
+  $ withTask taskName $ \Context{home, tasks} mtask ->
     case mtask of
       Just Task{priorities} ->
         if priorities == [] 
@@ -64,13 +63,13 @@ closeTask = arg @"task-name" \taskName -> raw
           else putStrLn $ "task " ++ taskName ++ " has remaining priorities."
       Nothing -> putStrLn "task is corrupted"
 
-listTasks = raw do
+listTasks = raw $ do
   Context{tasks} <- initializeOrFetch
   mapM_ putStrLn tasks
 
-listPriorities = raw do
+listPriorities = raw $ do
   Context{tasks} <- initializeOrFetch
-  forM_ tasks $ \taskName -> withTask taskName \_ mtask -> 
+  forM_ tasks $ \taskName -> withTask taskName $ \_ mtask -> 
     case mtask of
       Just Task{name, priorities} -> do
         putStrLn $ name ++ ": "
