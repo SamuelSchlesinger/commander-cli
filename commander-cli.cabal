@@ -55,8 +55,7 @@ executable task-manager
                        TypeApplications,
                        TypeOperators,
                        BlockArguments
-  build-depends:
-                       base >=4.13 && < 5,
+  build-depends:       base >=4.13 && < 5,
                        mtl >=2.2,
                        text >=1.2.4 && < 1.3,
                        directory >= 1.3 && < 1.4,
