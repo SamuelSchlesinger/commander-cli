@@ -1,5 +1,7 @@
 # commander-cli
 
+[![Build Status](https://travis-ci.org/SamuelSchlesinger/commander-cli.svg?branch=master)](https://travis-ci.org/SamuelSchlesinger/commander-cli)
+
 The commander-cli package contains two DSLs for describing command line programs, 
 one at the type level and one at the term level. The one at the type level looks 
 like this:
