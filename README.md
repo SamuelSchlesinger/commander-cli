@@ -16,16 +16,16 @@ instantiate a term of this type by writing
 
 ```haskell
 file :: ProgramT File IO
-file = sub (arg \file -> arg \contents -> raw $ writeFile file contents) 
-   :+: sub (arg \file -> raw $ readFile file >>= putStrLn)
+file = sub (arg $ \file -> arg $ \contents -> raw $ writeFile file contents) 
+   :+: sub (arg $ \file -> raw $ readFile file >>= putStrLn)
 ```
 
 I can write a term of this type without specifying the File type by using the
 TypeApplications extension.
 
 ```haskell
-file = sub @"writer" (arg @"file" \file -> arg @"contents" \contents -> raw $ writeFile file contents)
-   :+: sub @"reader" (arg @"file" \file -> raw $ readFile file >>= putStrLn)
+file = sub @"writer" (arg @"file" $ \file -> arg @"contents" $ \contents -> raw $ writeFile file contents)
+   :+: sub @"reader" (arg @"file" $ \file -> raw $ readFile file >>= putStrLn)
 ```
 
 The library consists of a few basic types which are important for understanding
