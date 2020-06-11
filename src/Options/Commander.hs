@@ -62,14 +62,40 @@ not have to write any boilerplate.
 -}
 module Options.Commander (
   -- ** Parsing Arguments and Options
+  {- |
+    If you want to use a Haskell type as an argument or option, you will need
+    to implement the 'Unrender' class. Your type needs to be 'Typeable' for
+    the sake of generating documentation.
+  -}
   Unrender(unrender),
-  -- ** Run CLI Programs
-  command, command_,
-  -- ** CLI Combinators
+  -- ** Defining CLI Programs
+  {- |
+    To construct a 'ProgramT' (a specification of a CLI program), you can
+    have 'arg'uments, 'opt'ions, 'raw' actions in a monad (typically IO),
+    'sub'programs, 'named' programs, you can combine programs together using 
+    '<+>', and you can generate primitive 'usage' information with 'usage'.
+    We also have a convenience combinator, 'toplevel', which lets you add
+    a name and a help command to your program using the 'usage' combinator.
+  -}
   arg, opt, raw, sub, named, flag, toplevel, (<+>), usage,
-  -- ** Type Level CLI Description
+  -- ** Describing CLI Programs
+  -- ** Run CLI Programs
+  {- |
+    To run a 'ProgramT' (a specification of a CLI program), you will 
+    need to use 'command' or 'command_'.
+  -}
+  command, command_,
+  {- |
+    Each 'ProgramT' has a type level description, build from these type level
+    combinators.
+  -}
   type (&), type (+), Arg, Opt, Named, Raw, Flag,
-  -- **
+  -- ** Interpreting CLI Programs
+  {- |
+    The 'HasProgram' class forms the backbone of this library, defining the
+    syntax for CLI programs using the 'ProgramT' data family, and defining
+    the interpretation of all of the various pieces of a CLI.
+  -}
   HasProgram(run, hoist, invocations),
   ProgramT(ArgProgramT, unArgProgramT,
            OptProgramT, unOptProgramT,
@@ -80,8 +106,18 @@ module Options.Commander (
            (:+:)
            ),
   -- ** The CommanderT Monad
+  {- |
+    The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.
+    It has the ability to backtrack and it maintains some state.
+  -}
   CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
   -- ** Middleware for CommanderT
+  {- |
+    If you want to modify your interpreted CLI program, in its 'CommanderT'
+    form, you can use the concept of 'Middleware'. A number of these are
+    provided for debugging complex CLI programs, in case they aren't doing
+    what you'd expect.
+  -}
   Middleware, logState, transform, withActionEffects, withDefeatEffects, withVictoryEffects
 ) where
 
