@@ -476,7 +476,9 @@ sub :: KnownSymbol s
     -> ProgramT (s & p) m a
 sub = SubProgramT
 
--- | Named command combinator, should only really be used at the top level.
+-- | Named command combinator, useful at the top level for naming
+-- a program. Typically, the name will be the name or alias of the
+-- executable you expect to produce.
 named :: KnownSymbol s 
       => ProgramT p m a 
       -> ProgramT (Named s & p) m a
