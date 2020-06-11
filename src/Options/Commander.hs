@@ -92,9 +92,10 @@ import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Generics (Generic)
 import Numeric.Natural
 import System.Environment (getArgs)
+import Data.Typeable (Typeable, typeRep)
 
 -- | A class for interpreting command line arguments into Haskell types.
-class Unrender t where
+class Typeable t => Unrender t where
   unrender :: Text -> Maybe t
 
 instance Unrender String where
@@ -128,7 +129,7 @@ instance Unrender Bool where
 newtype WrappedIntegral i = WrappedIntegral i
   deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
 
-instance Integral i => Unrender (WrappedIntegral i) where
+instance (Typeable i, Integral i) => Unrender (WrappedIntegral i) where
   unrender = either (const Nothing) h . signed decimal where
     h (n, "") = Just (fromInteger n)
     h _ = Nothing
@@ -143,7 +144,7 @@ deriving via WrappedIntegral Int64 instance Unrender Int64
 newtype WrappedNatural i = WrappedNatural i
   deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
 
-instance Integral i => Unrender (WrappedNatural i) where
+instance (Typeable i, Integral i) => Unrender (WrappedNatural i) where
   unrender = either (const Nothing) h . decimal where
     h (n, "") = if n >= 0 then Just (fromInteger n) else Nothing
     h _ = Nothing 
@@ -347,7 +348,10 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
           Nothing -> return (Defeat, State{..})
       [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
-  invocations = [(("<" <> pack (symbolVal (Proxy @name)) <> "> ") <>)] <*> invocations @p
+  invocations =
+    [(("<" <> pack (symbolVal (Proxy @name))
+    <> " :: " <> pack (show (typeRep (Proxy @t)))
+    <> "> ") <>)] <*> invocations @p
 
 instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
   data ProgramT (x + y) m a = ProgramT x m a :+: ProgramT y m a
@@ -374,7 +378,11 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
           Nothing -> return (Defeat, State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
-  invocations = [(("-" <> (pack $ symbolVal (Proxy @option)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)  ] <*> invocations @p
+  invocations =
+    [(("-" <> (pack $ symbolVal (Proxy @option)) 
+    <> " <" <> (pack $ symbolVal (Proxy @name)) 
+    <> " :: " <> (pack $ show (typeRep (Proxy @t)))
+    <> "> ") <>)  ] <*> invocations @p
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
@@ -476,7 +484,7 @@ flag = FlagProgramT
 toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m () 
          -> ProgramT (Named s & ("help" & Raw + p)) m ()
-toplevel p = named (sub (usage @(Named s & (p + "help" & Raw))) <+> p)
+toplevel p = named (sub (usage @(Named s & ("help" & Raw + p))) <+> p)
 
 -- | The command line program which consists of trying to enter one and
 -- then trying the other.
@@ -501,5 +509,11 @@ logState commander
         Action $ \state -> do
           liftIO $ print state
           fmap (first logState) (a state)
-      Defeat -> Defeat
-      Victory a -> Victory a
+      Defeat ->
+        Action $ \state -> do
+          liftIO $ print state
+          pure (Defeat, state)
+      Victory a ->
+        Action $ \state -> do
+          liftIO $ print state
+          pure (Victory a, state)
