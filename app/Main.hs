@@ -27,17 +27,24 @@ type TaskManager
   + "close"      & TaskProgram
   + "tasks"      & Raw
   + "priorities" & Raw
+  + Raw
   )
 
 type TaskProgram = Arg "task-name" String & Raw
   
 taskManager :: ProgramT TaskManager IO ()
 taskManager = toplevel @"task-manager" 
-  $   sub @"edit" editTask 
-  <+> sub @"open" newTask 
-  <+> sub @"close" closeTask 
+  $   sub @"edit" editTask
+  <+> sub @"open" newTask
+  <+> sub @"close" closeTask
   <+> sub @"tasks" listTasks
   <+> sub @"priorities" listPriorities
+  <+> hoist describeTaskManager (usage @TaskManager)
+  where
+    describeTaskManager :: IO a -> IO a
+    describeTaskManager io = do
+      putStrLn "Welcome to the Task Manager! This is a tool to help you manage tasks, each with priorities."
+      io
 
 editTask = arg @"task-name" $ \taskName -> raw 
   $ withTask taskName $ \Context{home} task -> callProcess "vim" [home ++ "/tasks/" ++ taskName ++ ".task"]

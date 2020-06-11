@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -28,7 +29,7 @@ Portability: POSIX, Windows
 
 Commander is an embedded domain specific language describing a command line
 interface, along with ways to run those as real programs. An complete example
-of such a command line interface can be found as:
+of such a command line interface is:
 
 @
 main :: IO ()
@@ -47,10 +48,21 @@ main = command_ . toplevel @"file" $
       Nothing -> pure ())
 @
 
+If I run this program with the argument help, it will output:
+
+@
+usage:
+file maybe-read \<filename :: String\> ~read
+file maybe-write -file \<file-to-write :: String\>
+@
+
 The point of this library is mainly so that you can write command line
-interfaces quickly and easily, and not have to write any boilerplate.
+interfaces quickly and easily, with somewhat useful help messages, and 
+not have to write any boilerplate.
 -}
 module Options.Commander (
+  -- ** Parsing Arguments and Options
+  Unrender(unrender),
   -- ** Run CLI Programs
   command, command_,
   -- ** CLI Combinators
@@ -69,11 +81,12 @@ module Options.Commander (
            ),
   -- ** The CommanderT Monad
   CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
-  -- ** Parsing Arguments and Options
-  Unrender(unrender),
+  -- ** Middleware for CommanderT
+  Middleware, logState, transform, withActionEffects, withDefeatEffects, withVictoryEffects
 ) where
 
 import Control.Applicative (Alternative(..))
+import Control.Arrow (first)
 import Control.Monad ((<=<))
 import Control.Monad (ap, void)
 import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
@@ -85,11 +98,13 @@ import Data.Text (Text, pack, unpack, stripPrefix, find)
 import Data.Text.Read (decimal, signed)
 import Data.Word
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+import GHC.Generics (Generic)
 import Numeric.Natural
 import System.Environment (getArgs)
+import Data.Typeable (Typeable, typeRep)
 
 -- | A class for interpreting command line arguments into Haskell types.
-class Unrender t where
+class Typeable t => Unrender t where
   unrender :: Text -> Maybe t
 
 instance Unrender String where
@@ -123,7 +138,7 @@ instance Unrender Bool where
 newtype WrappedIntegral i = WrappedIntegral i
   deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
 
-instance Integral i => Unrender (WrappedIntegral i) where
+instance (Typeable i, Integral i) => Unrender (WrappedIntegral i) where
   unrender = either (const Nothing) h . signed decimal where
     h (n, "") = Just (fromInteger n)
     h _ = Nothing
@@ -138,7 +153,7 @@ deriving via WrappedIntegral Int64 instance Unrender Int64
 newtype WrappedNatural i = WrappedNatural i
   deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
 
-instance Integral i => Unrender (WrappedNatural i) where
+instance (Typeable i, Integral i) => Unrender (WrappedNatural i) where
   unrender = either (const Nothing) h . decimal where
     h (n, "") = if n >= 0 then Just (fromInteger n) else Nothing
     h _ = Nothing 
@@ -312,7 +327,8 @@ instance Monad m => Alternative (CommanderT state m) where
 data State = State 
   { arguments :: [Text]
   , options :: HashMap Text Text
-  , flags :: HashSet Text }
+  , flags :: HashSet Text
+  } deriving (Generic, Show, Eq, Ord)
 
 -- | This is the workhorse of the library. Basically, it allows you to 
 -- 'run' your 'ProgramT'
@@ -341,7 +357,10 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
           Nothing -> return (Defeat, State{..})
       [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
-  invocations = [(("<" <> pack (symbolVal (Proxy @name)) <> "> ") <>)] <*> invocations @p
+  invocations =
+    [(("<" <> pack (symbolVal (Proxy @name))
+    <> " :: " <> pack (show (typeRep (Proxy @t)))
+    <> "> ") <>)] <*> invocations @p
 
 instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
   data ProgramT (x + y) m a = ProgramT x m a :+: ProgramT y m a
@@ -368,7 +387,11 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
           Nothing -> return (Defeat, State{..})
       Nothing  -> return (run (unOptProgramT f Nothing), State{..})
   hoist n (OptProgramT f) = OptProgramT (hoist n . f)
-  invocations = [(("-" <> (pack $ symbolVal (Proxy @option)) <> " <" <> (pack $ symbolVal (Proxy @name)) <> "> ") <>)  ] <*> invocations @p
+  invocations =
+    [(("-" <> (pack $ symbolVal (Proxy @option)) 
+    <> " <" <> (pack $ symbolVal (Proxy @name)) 
+    <> " :: " <> (pack $ show (typeRep (Proxy @t)))
+    <> "> ") <>)  ] <*> invocations @p
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
@@ -467,10 +490,10 @@ flag = FlagProgramT
 
 -- | A convenience combinator that constructs the program I often want
 -- to run out of a program I want to write.
-toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m) 
+toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m () 
          -> ProgramT (Named s & ("help" & Raw + p)) m ()
-toplevel p = named (sub (usage @(Named s & (p + "help" & Raw))) <+> p)
+toplevel p = named (sub (usage @(Named s & ("help" & Raw + p))) <+> p)
 
 -- | The command line program which consists of trying to enter one and
 -- then trying the other.
@@ -481,7 +504,63 @@ infixr 2 <+>
 
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.
-usage :: forall p m a. (MonadIO m, HasProgram p) => ProgramT Raw m ()
+usage :: forall p m. (MonadIO m, HasProgram p) => ProgramT Raw m ()
 usage = raw $ do
   liftIO $ putStrLn "usage:"
   void . traverse (liftIO . putStrLn . unpack) $ invocations @p
+
+-- | The type of middleware, which can transform interpreted command line programs
+-- by meddling with arguments, options, or flags, or by adding effects for
+-- every step. You can also change the underlying monad.
+type Middleware m n = forall a. CommanderT State m a -> CommanderT State n a
+
+-- | Middleware to transform the base monad with a natural transformation.
+transform :: (Monad m, Monad n) => (forall a. m a -> n a) -> Middleware m n
+transform f commander = case commander of
+  Action a -> Action $ \state -> do
+    (commander', state') <- f (a state)
+    pure (transform f commander', state')
+  Defeat -> Defeat
+  Victory a -> Victory a 
+
+-- | Middleware to add monadic effects for every 'Action'. Useful for
+-- debugging complex command line programs.
+withActionEffects :: Monad m => m a -> Middleware m m
+withActionEffects ma = transform (ma *>)
+
+-- | Middleware to have effects whenever the program might backtrack.
+withDefeatEffects :: Monad m => m a -> Middleware m m
+withDefeatEffects ma commander = case commander of
+  Action a -> Action $ \state -> do
+    (commander', state') <- a state
+    pure (withDefeatEffects ma commander', state')
+  Defeat -> Action $ \state -> ma *> pure (Defeat, state)
+  Victory a -> Victory a
+
+-- | Middleware to have effects whenever the program successfully computes
+-- a result.
+withVictoryEffects :: Monad m => m a -> Middleware m m
+withVictoryEffects ma commander = case commander of
+  Action a -> Action $ \state -> do
+    (commander', state') <- a state
+    pure (withVictoryEffects ma commander', state')
+  Defeat -> Defeat
+  Victory a -> Action $ \state -> ma *> pure (Victory a, state)
+
+-- | Middleware to log the state to standard out for every step of the
+-- 'CommanderT' computation.
+logState :: MonadIO m => Middleware m m
+logState commander
+  = case commander of
+      Action a -> do
+        Action $ \state -> do
+          liftIO $ print state
+          fmap (first logState) (a state)
+      Defeat ->
+        Action $ \state -> do
+          liftIO $ print state
+          pure (Defeat, state)
+      Victory a ->
+        Action $ \state -> do
+          liftIO $ print state
+          pure (Victory a, state)
