@@ -1,5 +1,6 @@
 # commander-cli
 
+[![Hackage](https://img.shields.io/hackage/v/commander-cli.svg)](https://hackage.haskell.org/package/commander-cli)
 [![Build Status](https://travis-ci.org/SamuelSchlesinger/commander-cli.svg?branch=master)](https://travis-ci.org/SamuelSchlesinger/commander-cli)
 
 The commander-cli package contains two DSLs for describing command line programs, 
