@@ -34,7 +34,8 @@ library
                        PolyKinds,
                        GADTs,
                        TypeOperators,
-                       DataKinds
+                       DataKinds,
+                       DeriveGeneric
   build-depends:       base >=4.12 && < 5,
                        mtl >=2.2 && <2.3,
                        text >=1.2 && < 1.3,

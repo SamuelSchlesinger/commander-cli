@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -51,6 +52,8 @@ The point of this library is mainly so that you can write command line
 interfaces quickly and easily, and not have to write any boilerplate.
 -}
 module Options.Commander (
+  -- ** Parsing Arguments and Options
+  Unrender(unrender),
   -- ** Run CLI Programs
   command, command_,
   -- ** CLI Combinators
@@ -69,11 +72,12 @@ module Options.Commander (
            ),
   -- ** The CommanderT Monad
   CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
-  -- ** Parsing Arguments and Options
-  Unrender(unrender),
+  -- ** Middleware for CommanderT
+  Middleware, logState
 ) where
 
 import Control.Applicative (Alternative(..))
+import Control.Arrow (first)
 import Control.Monad ((<=<))
 import Control.Monad (ap, void)
 import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
@@ -85,6 +89,7 @@ import Data.Text (Text, pack, unpack, stripPrefix, find)
 import Data.Text.Read (decimal, signed)
 import Data.Word
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+import GHC.Generics (Generic)
 import Numeric.Natural
 import System.Environment (getArgs)
 
@@ -312,7 +317,8 @@ instance Monad m => Alternative (CommanderT state m) where
 data State = State 
   { arguments :: [Text]
   , options :: HashMap Text Text
-  , flags :: HashSet Text }
+  , flags :: HashSet Text
+  } deriving (Generic, Show, Eq, Ord)
 
 -- | This is the workhorse of the library. Basically, it allows you to 
 -- 'run' your 'ProgramT'
@@ -485,3 +491,15 @@ usage :: forall p m a. (MonadIO m, HasProgram p) => ProgramT Raw m ()
 usage = raw $ do
   liftIO $ putStrLn "usage:"
   void . traverse (liftIO . putStrLn . unpack) $ invocations @p
+
+type Middleware m = forall a. CommanderT State m a -> CommanderT State m a
+
+logState :: MonadIO m => Middleware m
+logState commander
+  = case commander of
+      Action a -> do
+        Action $ \state -> do
+          liftIO $ print state
+          fmap (first logState) (a state)
+      Defeat -> Defeat
+      Victory a -> Victory a
