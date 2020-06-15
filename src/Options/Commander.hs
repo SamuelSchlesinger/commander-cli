@@ -138,6 +138,9 @@ import GHC.Generics (Generic)
 import Numeric.Natural
 import System.Environment (getArgs)
 import Data.Typeable (Typeable, typeRep)
+import qualified Data.ByteString as SBS
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy as LBS
 
 -- | A class for interpreting command line arguments into Haskell types.
 class Typeable t => Unrender t where
@@ -148,6 +151,12 @@ instance Unrender String where
 
 instance Unrender Text where
   unrender = Just
+
+instance Unrender SBS.ByteString where
+  unrender = Just . BS8.pack . unpack
+
+instance Unrender LBS.ByteString where
+  unrender = fmap LBS.fromStrict <$> unrender
 
 -- | A useful default unrender for small, bounded data types.
 unrenderSmall :: (Enum a, Bounded a, Show a) => Text -> Maybe a
