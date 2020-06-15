@@ -1,36 +1,12 @@
-# commander-cli
+# Commander CLI
 
 [![Hackage](https://img.shields.io/hackage/v/commander-cli.svg)](https://hackage.haskell.org/package/commander-cli)
 [![Build Status](https://travis-ci.org/SamuelSchlesinger/commander-cli.svg?branch=master)](https://travis-ci.org/SamuelSchlesinger/commander-cli)
 
-The commander-cli package contains two DSLs for describing command line programs, 
-one at the type level and one at the term level. The one at the type level looks 
-like this:
-
-```haskell
-type File = "writer" & Arg "file" FilePath & Arg "contents" FilePath & Raw
-          + "reader" & Arg "file" FilePath & Raw
-```
-
-This is a type which encodes information about an command line program we want to write. We can
-instantiate a term of this type by writing
-
-```haskell
-file :: ProgramT File IO
-file = sub (arg $ \file -> arg $ \contents -> raw $ writeFile file contents) 
-   :+: sub (arg $ \file -> raw $ readFile file >>= putStrLn)
-```
-
-I can write a term of this type without specifying the File type by using the
-TypeApplications extension.
-
-```haskell
-file = sub @"writer" (arg @"file" $ \file -> arg @"contents" $ \contents -> raw $ writeFile file contents)
-   :+: sub @"reader" (arg @"file" $ \file -> raw $ readFile file >>= putStrLn)
-```
-
-The library consists of a few basic types which are important for understanding
-how to use it. The first thing is the class
+This library is meant to allow Haskell programs to quickly and easily construct
+command line interfaces which are easy to use, especially as a Haskell user. To
+begin, I suggest viewing the task-manager application which comes with this
+repository. The library is based around the following classes:
 
 ```haskell
 class Unrender r where
