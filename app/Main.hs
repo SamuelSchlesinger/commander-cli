@@ -143,6 +143,7 @@ withTask taskName action = do
         Nothing -> action c Nothing
     else putStrLn $ "task " ++ taskName ++ " does not exist."
 
+initializeOrFetch :: IO Context
 initializeOrFetch = do
   home <- getHomeDirectory >>= makeAbsolute
   withCurrentDirectory home $ do
@@ -150,4 +151,5 @@ initializeOrFetch = do
       True -> Context home . map (takeWhile (/= '.')) . filter (".task" `isSuffixOf`) <$> listDirectory "tasks"
       False -> Context home [] <$ createDirectory "tasks"
   
+main :: IO ()
 main = command_ taskManager
