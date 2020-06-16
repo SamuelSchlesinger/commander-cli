@@ -37,10 +37,10 @@ library
                        DataKinds,
                        DeriveGeneric
   build-depends:       base >=4.12 && < 5,
-                       mtl >=2.2 && <2.3,
-                       text >=1.2 && < 1.3,
-                       unordered-containers >=0.2 && < 0.3,
-                       bytestring >=0.8 && <0.11
+                       bytestring >=0.8 && <1,
+                       mtl >=2.2 && <3,
+                       text >=1.2 && <2,
+                       unordered-containers >=0.2 && < 1
   hs-source-dirs:      src
   default-language:    Haskell2010
 
@@ -56,10 +56,10 @@ executable task-manager
                        TypeApplications,
                        TypeOperators
   build-depends:       base >=4.12 && < 5,
-                       mtl >=2.2,
-                       text >=1.2.4 && < 1.3,
-                       directory >= 1.3 && < 1.4,
-                       process >= 1.6 && < 1.7,
+                       mtl >=2.2 && <3,
+                       text >=1.2 && < 2,
+                       directory >= 1.3 && < 2,
+                       process >= 1.6 && < 2,
                        commander-cli
   hs-source-dirs:      app
   default-language:    Haskell2010
@@ -68,7 +68,7 @@ test-suite test-commander
   type:                exitcode-stdio-1.0
   main-is:             Test.hs
   build-depends:       base >= 4.12 && < 5,
-                       text >=1.2.4 && < 1.3,
-                       unordered-containers >= 0.2 && < 0.3,
+                       text >=1.2 && < 2,
+                       unordered-containers >= 0.2 && < 1,
                        commander-cli
   default-language:    Haskell2010

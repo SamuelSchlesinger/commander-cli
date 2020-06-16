@@ -2,5 +2,6 @@ language: haskell
 ghc:
   - "8.6"
   - "8.8"
+  - "8.10"
 
 cabal: "2.4"
