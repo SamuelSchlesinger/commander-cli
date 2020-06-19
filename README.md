@@ -5,8 +5,22 @@
 
 This library is meant to allow Haskell programs to quickly and easily construct
 command line interfaces which are easy to use, especially as a Haskell user. To
-begin, I suggest viewing the task-manager application which comes with this
-repository. The library is based around the following classes:
+begin, I suggest viewing/playing with the task-manager application which
+comes with this repository. Its usage info is generated as:
+
+```bash
+usage:
+task-manager help 
+task-manager -d <task-directory :: [Char]> edit <task-name :: [Char]> 
+task-manager -d <task-directory :: [Char]> open <task-name :: [Char]> 
+task-manager -d <task-directory :: [Char]> close <task-name :: [Char]> 
+task-manager -d <task-directory :: [Char]> tasks 
+task-manager -d <task-directory :: [Char]> priorities 
+task-manager -d <task-directory :: [Char]> 
+```
+
+
+The library is based around the following classes:
 
 ```haskell
 class Unrender r where
