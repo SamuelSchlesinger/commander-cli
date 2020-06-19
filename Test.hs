@@ -69,3 +69,11 @@ bigProgTests = do
   testBool =<< isNothing <$> test bigProg (State ["argument"] (HashMap.fromList [("opt", "option")]) (HashSet.singleton "flag"))
   testBool =<< (== Just False) <$> test bigProg (State ["option"] (HashMap.fromList [("opt'", "option")]) mempty)
   testBool =<< (== Just False) <$> test bigProg (State ["option"] (HashMap.fromList [("opt", "1")]) (HashSet.singleton "flag"))
+
+optDefProg :: (String -> Bool) -> ProgramT (Opt "o" "opt" String & Raw) IO Bool
+optDefProg prop = optDef "Default" \o -> raw (pure (prop o))
+
+optDefTest :: IO ()
+optDefTest = parlay (== "Default") (State mempty mempty mempty)
+          >> parlay (== "hello") (State mempty (HashMap.fromList [("o", "hello")]) mempty) where
+  parlay prop state = maybe exitFailure (cond (pure ()) exitFailure) =<< runCommanderT (run (optDefProg prop)) state

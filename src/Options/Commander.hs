@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
@@ -77,7 +79,7 @@ module Options.Commander (
     We also have a convenience combinator, 'toplevel', which lets you add
     a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, raw, sub, named, flag, toplevel, (<+>), usage,
+  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage,
   -- ** Describing CLI Programs
   -- ** Run CLI Programs
   {- |
@@ -98,7 +100,7 @@ module Options.Commander (
   -}
   HasProgram(run, hoist, invocations),
   ProgramT(ArgProgramT, unArgProgramT,
-           OptProgramT, unOptProgramT,
+           OptProgramT, unOptProgramT, unOptDefault,
            RawProgramT, unRawProgramT,
            SubProgramT, unSubProgramT,
            NamedProgramT, unNamedProgramT,
@@ -423,15 +425,17 @@ instance HasProgram Raw where
 
 
 instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => HasProgram (Opt option name t & p) where
-  newtype ProgramT (Opt option name t & p) m a = OptProgramT { unOptProgramT :: Maybe t -> ProgramT p m a }
+  data ProgramT (Opt option name t & p) m a = OptProgramT
+    { unOptProgramT :: Maybe t -> ProgramT p m a
+    , unOptDefault :: Maybe t }
   run f = Action $ \State{..} -> do
     case HashMap.lookup (pack $ symbolVal (Proxy @option)) options of
       Just opt' -> 
         case unrender opt' of
           Just t -> return (run (unOptProgramT f (Just t)), State{..})
           Nothing -> return (Defeat, State{..})
-      Nothing  -> return (run (unOptProgramT f Nothing), State{..})
-  hoist n (OptProgramT f) = OptProgramT (hoist n . f)
+      Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
+  hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   invocations =
     [(("-" <> (pack $ symbolVal (Proxy @option)) 
     <> " <" <> (pack $ symbolVal (Proxy @name)) 
@@ -508,7 +512,14 @@ arg = ArgProgramT
 opt :: (KnownSymbol option, KnownSymbol name)
     => (Maybe x -> ProgramT p m a) 
     -> ProgramT (Opt option name x & p) m a
-opt = OptProgramT
+opt = flip OptProgramT Nothing
+
+-- | Option combinator with default
+optDef :: (KnownSymbol option, KnownSymbol name)
+  => x
+  -> (x -> ProgramT p m a)
+  -> ProgramT (Opt option name x & p) m a
+optDef x f = OptProgramT { unOptDefault = Just x, unOptProgramT = \case { Just x -> f x; Nothing -> error "Violated invariant of optDef" } }
 
 -- | Raw monadic combinator
 raw :: m a 

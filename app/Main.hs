@@ -20,25 +20,27 @@ import System.Exit
 import Data.Either
 
 type TaskManager
-  = Named "task-manager" &
-  ( "help"       & Raw
-  + "edit"       & TaskProgram
-  + "open"       & TaskProgram
-  + "close"      & TaskProgram
-  + "tasks"      & Raw
-  + "priorities" & Raw
-  + Raw
+  = Named "task-manager"
+  & ("help" & Raw
+  + Opt "d" "task-directory" FilePath
+    & ("edit"  & TaskProgram
+     + "open"  & TaskProgram
+     + "close" & TaskProgram
+     + "tasks" & Raw
+     + "priorities" & Raw
+     + Raw
+    )
   )
 
 type TaskProgram = Arg "task-name" String & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = toplevel @"task-manager" 
-  $   sub @"edit" editTask
-  <+> sub @"open" newTask
-  <+> sub @"close" closeTask
-  <+> sub @"tasks" listTasks
-  <+> sub @"priorities" listPriorities
+taskManager = toplevel @"task-manager" . optDef @"d" @"task-directory" "tasks" $ \tasksFilePath -> 
+      sub @"edit" (editTask tasksFilePath) 
+  <+> sub @"open" (newTask tasksFilePath)
+  <+> sub @"close" (closeTask tasksFilePath)
+  <+> sub @"tasks" (listTasks tasksFilePath)
+  <+> sub @"priorities" (listPriorities tasksFilePath)
   <+> hoist describeTaskManager (usage @TaskManager)
   where
     describeTaskManager :: IO a -> IO a
@@ -46,35 +48,35 @@ taskManager = toplevel @"task-manager"
       putStrLn "Welcome to the Task Manager! This is a tool to help you manage tasks, each with priorities."
       io
 
-editTask = arg @"task-name" $ \taskName -> raw 
-  $ withTask taskName $ \Context{home} task -> callProcess "vim" [home ++ "/tasks/" ++ taskName ++ ".task"]
+editTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
+  $ withTask tasksFilePath taskName $ \Context{home} task -> callProcess "vim" [home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"]
 
-newTask = arg @"task-name" $ \taskName -> raw $ do
-  Context{home, tasks} <- initializeOrFetch
+newTask tasksFilePath = arg @"task-name" $ \taskName -> raw $ do
+  Context{home, tasks} <- initializeOrFetch tasksFilePath
   if not (taskName `elem` tasks)
     then do
-      let path = home ++ "/tasks/" ++ taskName ++ ".task"
+      let path = home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"
       callProcess "touch" [path]
       appendFile path (renderPriorities $ [])
       callProcess "vim" [path]
     else putStrLn $ "task " ++ taskName ++ " already exists."
 
-closeTask = arg @"task-name" $ \taskName -> raw 
-  $ withTask taskName $ \Context{home, tasks} mtask ->
+closeTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
+  $ withTask tasksFilePath taskName $ \Context{home, tasks} mtask ->
     case mtask of
       Just Task{priorities} ->
         if priorities == [] 
-          then removeFile (home ++ "/tasks/" ++ taskName ++ ".task")
+          then removeFile (home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task")
           else putStrLn $ "task " ++ taskName ++ " has remaining priorities."
       Nothing -> putStrLn "task is corrupted"
 
-listTasks = raw $ do
-  Context{tasks} <- initializeOrFetch
+listTasks tasksFilePath = raw $ do
+  Context{tasks} <- initializeOrFetch tasksFilePath
   mapM_ putStrLn tasks
 
-listPriorities = raw $ do
-  Context{tasks} <- initializeOrFetch
-  forM_ tasks $ \taskName -> withTask taskName $ \_ mtask -> 
+listPriorities tasksFilePath = raw $ do
+  Context{tasks} <- initializeOrFetch tasksFilePath
+  forM_ tasks $ \taskName -> withTask tasksFilePath taskName $ \_ mtask -> 
     case mtask of
       Just Task{name, priorities} -> do
         putStrLn $ name ++ ": "
@@ -91,22 +93,22 @@ data Task = Task
   , priorities :: [(String, String)]
   } deriving (Show, Read)
 
-readTask :: String -> IO (Maybe Task)
-readTask taskName = do
-  Context{home, tasks} <- initializeOrFetch
+readTask :: FilePath -> String -> IO (Maybe Task)
+readTask tasksFilePath taskName = do
+  Context{home, tasks} <- initializeOrFetch tasksFilePath
   if taskName `elem` tasks
     then do
-      let path = home ++ "/tasks/" ++ taskName ++ ".task"
+      let path = home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"
       stringTask <- readFile path
       return $ parseTask taskName stringTask
     else do
       putStrLn $ "task " ++ taskName ++ " does not exist."
       exitSuccess
 
-writeTask :: Task -> IO ()
-writeTask Task{name, priorities} = do
-  Context{home, tasks} <- initializeOrFetch
-  let path = home ++ "/tasks/" ++ name ++ ".task"
+writeTask :: FilePath -> Task -> IO ()
+writeTask tasksFilePath Task{name, priorities} = do
+  Context{home, tasks} <- initializeOrFetch tasksFilePath
+  let path = home ++ "/" <> tasksFilePath <> "/" ++ name ++ ".task"
   writeFile path $ renderPriorities priorities
 
 renderPriorities :: [(String, String)] -> String
@@ -133,23 +135,23 @@ parseTask taskName
         Right _ : xs -> Nothing
         [] -> Just $ Task taskName []
 
-withTask :: String -> (Context -> Maybe Task -> IO ()) -> IO ()
-withTask taskName action = do
-  c@Context{tasks, home} <- initializeOrFetch
+withTask :: FilePath -> String -> (Context -> Maybe Task -> IO ()) -> IO ()
+withTask tasksFilePath taskName action = do
+  c@Context{tasks, home} <- initializeOrFetch tasksFilePath
   if taskName `elem` tasks 
     then do
-      readTask taskName >>= \case
+      readTask tasksFilePath taskName >>= \case
         Just task -> action c (Just task)
         Nothing -> action c Nothing
     else putStrLn $ "task " ++ taskName ++ " does not exist."
 
-initializeOrFetch :: IO Context
-initializeOrFetch = do
+initializeOrFetch :: FilePath -> IO Context
+initializeOrFetch tasksFilePath = do
   home <- getHomeDirectory >>= makeAbsolute
   withCurrentDirectory home $ do
-    doesDirectoryExist "tasks" >>= \case
-      True -> Context home . map (takeWhile (/= '.')) . filter (".task" `isSuffixOf`) <$> listDirectory "tasks"
-      False -> Context home [] <$ createDirectory "tasks"
+    doesDirectoryExist tasksFilePath >>= \case
+      True -> Context home . map (takeWhile (/= '.')) . filter (".task" `isSuffixOf`) <$> listDirectory tasksFilePath
+      False -> Context home [] <$ createDirectory tasksFilePath
   
 main :: IO ()
 main = command_ taskManager
