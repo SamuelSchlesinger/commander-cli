@@ -217,19 +217,39 @@ instance Unrender Char where
 
 -- | The type level argument combinator, with a 'Symbol' designating the
 -- name of that argument.
-data Arg :: Symbol -> * -> *
+--
+-- Should be documented:
+-- Argument:
+--   name: <argument-name>
+--   (description: <argument-description>)?
+--   haskell type: <show-typerep>
+-- 
+data Arg :: Maybe Symbol -> Symbol -> * -> *
 
 -- | The type level option combinator, with a 'Symbol' designating the
 -- option's name and another representing the metavariables name for
 -- documentation purposes.
-data Opt :: Symbol -> Symbol -> * -> *
+--
+-- Should be documented:
+-- option:
+--   option-short: <option-short>
+--   name: <option-name>
+--   (description: <option-description>)?
+--   haskell type: <show-typerep>
+data Opt :: Maybe Symbol -> Symbol -> Symbol -> * -> *
 
 -- | The type level naming combinator, giving your program a name for the
 -- sake of documentation.
-data Named :: Symbol -> *
+--
+-- Should be documented:
+-- name: <program-name>
+-- description: <documentation-string>?
+data Named :: Maybe Symbol -> Symbol -> *
 
 -- | The type level program sequencing combinator, taking two program types
 -- and sequencing them one after another.
+-- 
+-- Should be documented in interaction with +.
 data (&) :: k -> * -> *
 infixr 4 &
 
@@ -239,12 +259,20 @@ data Raw :: *
 
 -- | The type level flag combinator, taking a name as input, allowing your
 -- program to take flags with the syntax @~flag@.
-data Flag :: Symbol -> *
+-- 
+-- Should be documented:
+-- flag:
+--   flag-short: <flag-short>
+--   name: <flag-name>
+--   (description: <flag-description>)?
+data Flag :: Maybe Symbol -> Symbol -> *
 
 -- | The type level combining combinator, taking two program types as
 -- input, and being interpreted as a program which attempts to run the
 -- first command line program and, if parsing its flags, subprograms,
 -- options or arguments fails, runs the second, otherwise failing.
+--
+-- Should be documented in interaction with &
 data a + b
 infixr 2 +
 
