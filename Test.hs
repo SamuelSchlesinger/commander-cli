@@ -15,10 +15,11 @@ import Options.Commander
 import Control.Monad
 import System.Exit
 import Control.Exception
+import System.Environment (setEnv)
 import Data.Maybe
 
 main :: IO ()
-main = rawTest >> argTest >> optTest >> flagTest >> bigProgTests
+main = rawTest >> argTest >> optTest >> flagTest >> bigProgTests >> optDefTest >> envTest
 
 rawProg :: ProgramT Raw IO Bool
 rawProg = raw (pure True)
@@ -81,3 +82,14 @@ optDefTest =
   >> parlay exitFailure (pure ()) (== "hello0") (State mempty (HashMap.fromList [("o", "hello")]) mempty)
   where
   parlay y n prop state = maybe exitFailure (cond y n) =<< runCommanderT (run (optDefProg prop)) state
+
+envProg :: (x -> Bool) -> ProgramT (Env 'Required "ONOGOTTAFINDABIGNAME" x & Raw) IO Bool
+envProg prop = envReq \e -> raw (pure (prop e))
+
+envTest :: IO ()
+envTest = do
+  testBool =<< isNothing <$> test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
+  setEnv "ONOGOTTAFINDABIGNAME" "POOP"
+  testMaybeBool =<< test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
+  setEnv "ONOGOTTAFINDABIGNAME" "POP"
+  testMaybeBool =<< fmap not <$> test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)

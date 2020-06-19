@@ -73,13 +73,14 @@ module Options.Commander (
   -- ** Defining CLI Programs
   {- |
     To construct a 'ProgramT' (a specification of a CLI program), you can
-    have 'arg'uments, 'opt'ions, 'raw' actions in a monad (typically IO),
+    have 'arg'uments, 'opt'ions, or 'raw' actions in a monad (typically IO),
     'sub'programs, 'named' programs, you can combine programs together using 
     '<+>', and you can generate primitive 'usage' information with 'usage'.
+    There are combinators for retrieving environment variables as well.
     We also have a convenience combinator, 'toplevel', which lets you add
     a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage,
+  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, envReq, envOpt, envOptDef,
   -- ** Describing CLI Programs
   -- ** Run CLI Programs
   {- |
@@ -91,7 +92,7 @@ module Options.Commander (
     Each 'ProgramT' has a type level description, build from these type level
     combinators.
   -}
-  type (&), type (+), Arg, Opt, Named, Raw, Flag,
+  type (&), type (+), Arg, Opt, Named, Raw, Flag, Env, Optionality(Required, Optional),
   -- ** Interpreting CLI Programs
   {- |
     The 'HasProgram' class forms the backbone of this library, defining the
@@ -138,7 +139,7 @@ import Data.Word
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Generics (Generic)
 import Numeric.Natural
-import System.Environment (getArgs)
+import System.Environment (getArgs, lookupEnv)
 import Data.Typeable (Typeable, typeRep)
 import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Char8 as BS8
@@ -215,6 +216,10 @@ deriving via WrappedNatural Word64 instance Unrender Word64
 instance Unrender Char where
   unrender = find (const True)
 
+-- | The type level naming combinator, giving your program a name for the
+-- sake of documentation.
+data Named :: Symbol -> *
+
 -- | The type level argument combinator, with a 'Symbol' designating the
 -- name of that argument.
 data Arg :: Symbol -> * -> *
@@ -224,22 +229,25 @@ data Arg :: Symbol -> * -> *
 -- documentation purposes.
 data Opt :: Symbol -> Symbol -> * -> *
 
--- | The type level naming combinator, giving your program a name for the
--- sake of documentation.
-data Named :: Symbol -> *
+-- | The type level flag combinator, taking a name as input, allowing your
+-- program to take flags with the syntax @~flag@.
+data Flag :: Symbol -> *
 
--- | The type level program sequencing combinator, taking two program types
--- and sequencing them one after another.
-data (&) :: k -> * -> *
-infixr 4 &
+-- | The type level environment variable combinator, taking a name as
+-- input, allowing your program to take environment variables as input
+-- automatically.
+data Env :: Optionality -> Symbol -> * -> *
 
 -- | The type level raw monadic program combinator, allowing a command line
 -- program to just do some computation.
 data Raw :: *
 
--- | The type level flag combinator, taking a name as input, allowing your
--- program to take flags with the syntax @~flag@.
-data Flag :: Symbol -> *
+data Optionality = Required | Optional
+
+-- | The type level program sequencing combinator, taking two program types
+-- and sequencing them one after another.
+data (&) :: k -> * -> *
+infixr 4 &
 
 -- | The type level combining combinator, taking two program types as
 -- input, and being interpreted as a program which attempts to run the
@@ -394,6 +402,41 @@ class HasProgram p where
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
   invocations :: [Text]
 
+instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Required name t & p) where
+  newtype ProgramT (Env 'Required name t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
+  run f = Action $ \state -> do
+    val <- lookupEnv (symbolVal (Proxy @name))
+    case val of
+      Just v ->
+        case unrender (pack v) of
+          Just t -> return (run (unEnvProgramT'Required f t), state)  
+          Nothing -> return (Defeat, state)
+      Nothing -> return (Defeat, state)
+  hoist n (EnvProgramT'Required f) = EnvProgramT'Required (hoist n . f)
+  invocations =
+    [(("(required env: " <> pack (symbolVal (Proxy @name))
+    <> " :: " <> pack (show (typeRep (Proxy @t)))
+    <> "> ") <>)] <*> invocations @p
+
+instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Optional name t & p) where
+  data ProgramT (Env 'Optional name t & p) m a = EnvProgramT'Optional
+    { unEnvProgramT'Optional :: Maybe t -> ProgramT p m a
+    , unEnvDefault :: Maybe t }
+  run f = Action $ \state -> do
+    val <- lookupEnv (symbolVal (Proxy @name))
+    case val of
+      Just v ->
+        case unrender (pack v) of
+          Just t -> return (run (unEnvProgramT'Optional f t), state)  
+          Nothing -> return (Defeat, state)
+      Nothing -> return (run (unEnvProgramT'Optional f (unEnvDefault f)), state)
+
+  hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
+  invocations =
+    [(("(optional env: " <> pack (symbolVal (Proxy @name))
+    <> " :: " <> pack (show (typeRep (Proxy @t)))
+    <> "> ") <>)] <*> invocations @p
+
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
   newtype ProgramT (Arg name t & p) m a = ArgProgramT { unArgProgramT :: t -> ProgramT p m a }
   run f = Action $ \State{..} -> do
@@ -501,6 +544,27 @@ command :: HasProgram p
         => ProgramT p IO a 
         -> IO (Maybe a)
 command prog = initialState >>= runCommanderT (run prog)
+
+-- | Required environment variable combinator
+envReq :: KnownSymbol name
+  => (x -> ProgramT p m a)
+  -> ProgramT (Env 'Required name x & p) m a
+envReq = EnvProgramT'Required
+
+-- | Optional environment variable combinator
+envOpt :: KnownSymbol name
+  => (Maybe x -> ProgramT p m a)
+  -> ProgramT (Env 'Optional name x & p) m a
+envOpt = flip EnvProgramT'Optional Nothing
+
+-- | Optional environment variable combinator with default
+envOptDef :: KnownSymbol name
+  => x
+  -> (x -> ProgramT p m a)
+  -> ProgramT (Env 'Optional name x & p) m a
+envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Optional = \case { Just x -> f x; Nothing -> error "Violated invariant of optEnvDef" } }
+
+-- | Environment 
 
 -- | Argument combinator
 arg :: KnownSymbol name

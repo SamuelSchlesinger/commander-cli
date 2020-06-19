@@ -13,7 +13,7 @@ import Control.Monad
 import Options.Commander 
 import Prelude
 import System.Directory
-import System.Process
+import System.Process hiding (env)
 import Data.List
 import Text.Read
 import System.Exit
@@ -22,7 +22,7 @@ import Data.Either
 type TaskManager
   = Named "task-manager"
   & ("help" & Raw
-  + Opt "d" "task-directory" FilePath
+  + Env 'Required "TASK_DIRECTORY" FilePath
     & ("edit"  & TaskProgram
      + "open"  & TaskProgram
      + "close" & TaskProgram
@@ -35,7 +35,7 @@ type TaskManager
 type TaskProgram = Arg "task-name" String & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = toplevel @"task-manager" . optDef @"d" @"task-directory" "tasks" $ \tasksFilePath -> 
+taskManager = toplevel @"task-manager" . envReq @"TASK_DIRECTORY" $ \tasksFilePath -> 
       sub @"edit" (editTask tasksFilePath) 
   <+> sub @"open" (newTask tasksFilePath)
   <+> sub @"close" (closeTask tasksFilePath)

@@ -10,13 +10,13 @@ comes with this repository. Its usage info is generated as:
 
 ```bash
 usage:
-task-manager help 
-task-manager -d <task-directory :: [Char]> edit <task-name :: [Char]> 
-task-manager -d <task-directory :: [Char]> open <task-name :: [Char]> 
-task-manager -d <task-directory :: [Char]> close <task-name :: [Char]> 
-task-manager -d <task-directory :: [Char]> tasks 
-task-manager -d <task-directory :: [Char]> priorities 
-task-manager -d <task-directory :: [Char]> 
+task-manager help
+task-manager (env: TASK_DIRECTORY :: [Char]> edit <task-name :: [Char]>
+task-manager (env: TASK_DIRECTORY :: [Char]> open <task-name :: [Char]>
+task-manager (env: TASK_DIRECTORY :: [Char]> close <task-name :: [Char]>
+task-manager (env: TASK_DIRECTORY :: [Char]> tasks
+task-manager (env: TASK_DIRECTORY :: [Char]> priorities
+task-manager (env: TASK_DIRECTORY :: [Char]>
 ```
 
 
