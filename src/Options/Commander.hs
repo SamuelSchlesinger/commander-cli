@@ -243,6 +243,7 @@ data Env :: Optionality -> Symbol -> * -> *
 -- program to just do some computation.
 data Raw :: *
 
+-- | The type level tag for whether or not a variable is required or not.
 data Optionality = Required | Optional
 
 -- | The type level program sequencing combinator, taking two program types
