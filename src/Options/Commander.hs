@@ -54,6 +54,7 @@ If I run this program with the argument help, it will output:
 
 @
 usage:
+file help
 file maybe-read \<filename :: String\> ~read
 file maybe-write -file \<file-to-write :: String\>
 @
