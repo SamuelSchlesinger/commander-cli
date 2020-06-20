@@ -84,7 +84,7 @@ optDefTest =
   parlay y n prop state = maybe exitFailure (cond y n) =<< runCommanderT (run (optDefProg prop)) state
 
 envProg :: (x -> Bool) -> ProgramT (Env 'Required "ONOGOTTAFINDABIGNAME" x & Raw) IO Bool
-envProg prop = envReq \e -> raw (pure (prop e))
+envProg prop = env \e -> raw (pure (prop e))
 
 envTest :: IO ()
 envTest = do

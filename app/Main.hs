@@ -35,7 +35,7 @@ type TaskManager
 type TaskProgram = Arg "task-name" String & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = toplevel @"task-manager" . envReq @"TASK_DIRECTORY" $ \tasksFilePath -> 
+taskManager = toplevel @"task-manager" . env @"TASK_DIRECTORY" $ \tasksFilePath -> 
       sub @"edit" (editTask tasksFilePath) 
   <+> sub @"open" (newTask tasksFilePath)
   <+> sub @"close" (closeTask tasksFilePath)

@@ -11,12 +11,12 @@ comes with this repository. Its usage info is generated as:
 ```bash
 usage:
 task-manager help
-task-manager (env: TASK_DIRECTORY :: [Char]> edit <task-name :: [Char]>
-task-manager (env: TASK_DIRECTORY :: [Char]> open <task-name :: [Char]>
-task-manager (env: TASK_DIRECTORY :: [Char]> close <task-name :: [Char]>
-task-manager (env: TASK_DIRECTORY :: [Char]> tasks
-task-manager (env: TASK_DIRECTORY :: [Char]> priorities
-task-manager (env: TASK_DIRECTORY :: [Char]>
+task-manager (required env: TASK_DIRECTORY :: [Char]> edit <task-name :: [Char]>
+task-manager (required env: TASK_DIRECTORY :: [Char]> open <task-name :: [Char]>
+task-manager (required env: TASK_DIRECTORY :: [Char]> close <task-name :: [Char]>
+task-manager (required env: TASK_DIRECTORY :: [Char]> tasks
+task-manager (required env: TASK_DIRECTORY :: [Char]> priorities
+task-manager (required env: TASK_DIRECTORY :: [Char]>
 ```
 
 

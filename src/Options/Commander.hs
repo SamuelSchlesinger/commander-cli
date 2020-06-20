@@ -73,15 +73,14 @@ module Options.Commander (
   -- ** Defining CLI Programs
   {- |
     To construct a 'ProgramT' (a specification of a CLI program), you can
-    have 'arg'uments, 'opt'ions, or 'raw' actions in a monad (typically IO),
-    'sub'programs, 'named' programs, you can combine programs together using 
-    '<+>', and you can generate primitive 'usage' information with 'usage'.
-    There are combinators for retrieving environment variables as well.
-    We also have a convenience combinator, 'toplevel', which lets you add
-    a name and a help command to your program using the 'usage' combinator.
+    have 'arg'uments, 'opt'ions, 'raw' actions in a monad (typically IO),
+    'sub'programs, 'named' programs, 'env'ironment variables, you can combine 
+    programs together using '<+>', and you can generate primitive 'usage'
+    information with 'usage'. There are combinators for retrieving environment
+    variables as well. We also have a convenience combinator, 'toplevel',
+    which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, envReq, envOpt, envOptDef,
-  -- ** Describing CLI Programs
+  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef,
   -- ** Run CLI Programs
   {- |
     To run a 'ProgramT' (a specification of a CLI program), you will 
@@ -106,6 +105,8 @@ module Options.Commander (
            SubProgramT, unSubProgramT,
            NamedProgramT, unNamedProgramT,
            FlagProgramT, unFlagProgramT,
+           EnvProgramT'Optional, unEnvProgramT'Optional, unEnvDefault,
+           EnvProgramT'Required, unEnvProgramT'Required,
            (:+:)
            ),
   -- ** The CommanderT Monad
@@ -546,10 +547,10 @@ command :: HasProgram p
 command prog = initialState >>= runCommanderT (run prog)
 
 -- | Required environment variable combinator
-envReq :: KnownSymbol name
+env :: KnownSymbol name
   => (x -> ProgramT p m a)
   -> ProgramT (Env 'Required name x & p) m a
-envReq = EnvProgramT'Required
+env = EnvProgramT'Required
 
 -- | Optional environment variable combinator
 envOpt :: KnownSymbol name
