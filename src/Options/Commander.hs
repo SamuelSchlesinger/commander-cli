@@ -419,7 +419,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Requir
   invocations =
     [(("(required env: " <> pack (symbolVal (Proxy @name))
     <> " :: " <> pack (show (typeRep (Proxy @t)))
-    <> "> ") <>)] <*> invocations @p
+    <> ") ") <>)] <*> invocations @p
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Optional name t & p) where
   data ProgramT (Env 'Optional name t & p) m a = EnvProgramT'Optional
@@ -438,7 +438,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
   invocations =
     [(("(optional env: " <> pack (symbolVal (Proxy @name))
     <> " :: " <> pack (show (typeRep (Proxy @t)))
-    <> "> ") <>)] <*> invocations @p
+    <> ") ") <>)] <*> invocations @p
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
   newtype ProgramT (Arg name t & p) m a = ArgProgramT { unArgProgramT :: t -> ProgramT p m a }
