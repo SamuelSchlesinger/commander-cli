@@ -22,7 +22,7 @@ import Data.Either
 type TaskManager
   = Named "task-manager"
   & ("help" & Raw
-  + Env 'Required "TASK_DIRECTORY" FilePath
+  + Env 'Optional "TASK_DIRECTORY" FilePath
     & ("edit"  & TaskProgram
      + "open"  & TaskProgram
      + "close" & TaskProgram
@@ -35,7 +35,7 @@ type TaskManager
 type TaskProgram = Arg "task-name" String & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = toplevel @"task-manager" . env @"TASK_DIRECTORY" $ \tasksFilePath -> 
+taskManager = toplevel @"task-manager" . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
       sub @"edit" (editTask tasksFilePath) 
   <+> sub @"open" (newTask tasksFilePath)
   <+> sub @"close" (closeTask tasksFilePath)
