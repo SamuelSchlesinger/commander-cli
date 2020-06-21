@@ -428,9 +428,9 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
   run f = Action $ \state -> do
     val <- lookupEnv (symbolVal (Proxy @name))
     case val of
-      Just v ->
-        case unrender (pack v) of
-          Just t -> return (run (unEnvProgramT'Optional f t), state)  
+      Just v -> do
+        case unrender @t (pack v) of
+          Just t -> return (run (unEnvProgramT'Optional f (Just t)), state)  
           Nothing -> return (Defeat, state)
       Nothing -> return (run (unEnvProgramT'Optional f (unEnvDefault f)), state)
 

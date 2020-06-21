@@ -19,7 +19,16 @@ import System.Environment (setEnv)
 import Data.Maybe
 
 main :: IO ()
-main = rawTest >> argTest >> optTest >> flagTest >> bigProgTests >> optDefTest >> envTest
+main =
+     rawTest
+  >> argTest
+  >> optTest
+  >> flagTest
+  >> bigProgTests
+  >> optDefTest
+  >> envTest
+  >> envOptTest
+  >> envOptDefTest
 
 rawProg :: ProgramT Raw IO Bool
 rawProg = raw (pure True)
@@ -88,8 +97,34 @@ envProg prop = env \e -> raw (pure (prop e))
 
 envTest :: IO ()
 envTest = do
+  putStrLn "Testing environment variables"
   testBool =<< isNothing <$> test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
   setEnv "ONOGOTTAFINDABIGNAME" "POOP"
   testMaybeBool =<< test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
   setEnv "ONOGOTTAFINDABIGNAME" "POP"
   testMaybeBool =<< fmap not <$> test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
+
+envOptProg :: (Maybe x -> Bool) -> ProgramT (Env 'Optional "BIGNAME" x & Raw) IO Bool
+envOptProg prop = envOpt \e -> raw (pure (prop e))
+
+envOptProg' :: ProgramT (Env 'Optional "BIGNAME" x & Raw) IO (Maybe x)
+envOptProg' = envOpt \e -> raw (pure e)
+
+envOptTest :: IO ()
+envOptTest = do
+  putStrLn "Testing optional environment variables"
+  testMaybeBool =<< test (envOptProg (== (Nothing @Bool))) (State mempty mempty mempty)
+  setEnv "BIGNAME" "POP"
+  testMaybeBool =<< fmap not <$> test (envOptProg (== (Just ("POOP" :: String)))) (State mempty mempty mempty)
+  testMaybeBool =<< test (envOptProg (== (Just ("POP" :: String)))) (State mempty mempty mempty)
+
+envOptDefProg :: x -> (x -> Bool) -> ProgramT (Env 'Optional "CORPUS" x & Raw) IO Bool
+envOptDefProg x prop = envOptDef x \e -> raw (pure (prop e))
+
+envOptDefTest :: IO ()
+envOptDefTest = do
+  putStrLn "Testing optional environment variables with hard-coded defaults"
+  testMaybeBool =<< test (envOptDefProg (10 :: Int) (== 10)) (State mempty mempty mempty)
+  testMaybeBool =<< fmap not <$> test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
+  setEnv "CORPUS" "POOP"
+  testMaybeBool =<< test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
