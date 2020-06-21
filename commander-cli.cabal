@@ -1,7 +1,7 @@
 cabal-version:       2.4
 
 name:                commander-cli
-version:             0.6.1.0
+version:             0.6.2.0
 synopsis:            A command line argument/option parser library built around a monadic metaphor
 description:         A command line argument/option parser library built around a monadic metaphor.
 homepage:            https://github.com/SamuelSchlesinger/commander-cli
