@@ -2,15 +2,12 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -128,9 +125,9 @@ module Options.Commander (
 
 import Control.Applicative (Alternative(..))
 import Control.Arrow (first)
-import Control.Monad ((<=<))
-import Control.Monad (ap, void)
+import Control.Monad (ap, void, (<=<))
 import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
+import Data.Functor (($>))
 import Data.HashMap.Strict as HashMap
 import Data.HashSet as HashSet
 import Data.Int
@@ -358,9 +355,9 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
       Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   invocations =
-    [(("-" <> (pack $ symbolVal (Proxy @option)) 
-    <> " <" <> (pack $ symbolVal (Proxy @name)) 
-    <> " :: " <> (pack $ show (typeRep (Proxy @t)))
+    [(("-" <> pack (symbolVal (Proxy @option)) 
+    <> " <" <> pack (symbolVal (Proxy @name)) 
+    <> " :: " <> pack (show (typeRep (Proxy @t)))
     <> "> ") <>)  ] <*> invocations @p
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
@@ -369,7 +366,7 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
     let presence = HashSet.member (pack (symbolVal (Proxy @flag))) flags
     return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
-  invocations = [(("~" <> (pack $ symbolVal (Proxy @flag)) <> " ") <>)] <*> invocations @p
+  invocations = [(("~" <> pack (symbolVal (Proxy @flag)) <> " ") <>)] <*> invocations @p
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
   newtype ProgramT (Named name &p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
@@ -387,7 +384,7 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
           else return (Defeat, State{..})
       [] -> return (Defeat, State{..})
   hoist n = SubProgramT . hoist n . unSubProgramT
-  invocations = [((pack $ symbolVal (Proxy @sub) <> " ") <> )] 
+  invocations = [(pack (symbolVal (Proxy @sub) <> " ") <> )] 
             <*> invocations @p
 
 -- | A simple default for getting out the arguments, options, and flags
@@ -534,7 +531,7 @@ withDefeatEffects ma commander = case commander of
   Action a -> Action $ \state -> do
     (commander', state') <- a state
     pure (withDefeatEffects ma commander', state')
-  Defeat -> Action $ \state -> ma *> pure (Defeat, state)
+  Defeat -> Action $ \state -> ma $> (Defeat, state)
   Victory a -> Victory a
 
 -- | Middleware to have effects whenever the program successfully computes
@@ -545,14 +542,14 @@ withVictoryEffects ma commander = case commander of
     (commander', state') <- a state
     pure (withVictoryEffects ma commander', state')
   Defeat -> Defeat
-  Victory a -> Action $ \state -> ma *> pure (Victory a, state)
+  Victory a -> Action $ \state -> ma $> (Victory a, state)
 
 -- | Middleware to log the state to standard out for every step of the
 -- 'CommanderT' computation.
 logState :: MonadIO m => Middleware m m
 logState commander
   = case commander of
-      Action a -> do
+      Action a ->
         Action $ \state -> do
           liftIO $ print state
           fmap (first logState) (a state)

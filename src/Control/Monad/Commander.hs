@@ -43,8 +43,7 @@ runCommanderT :: Monad m
               -> m (Maybe a)
 runCommanderT (Action action) state = do
   (action', state') <- action state
-  m <- runCommanderT action' state'
-  return m
+  runCommanderT action' state'
 runCommanderT Defeat _ = return Nothing
 runCommanderT (Victory a) _ = return (Just a)
 
