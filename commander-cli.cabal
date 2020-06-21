@@ -15,7 +15,7 @@ category:            System, CLI, Options, Parsing
 extra-source-files:  CHANGELOG.md, README.md
 
 library
-  exposed-modules:     Options.Commander, Control.Commander
+  exposed-modules:     Options.Commander, Control.Monad.Commander
   other-extensions:    ViewPatterns,
                        DerivingVia,
                        StandaloneDeriving,

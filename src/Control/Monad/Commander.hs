@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
-module Control.Commander (
+module Control.Monad.Commander (
   -- ** The CommanderT Monad
   {- |
     The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.

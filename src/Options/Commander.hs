@@ -147,7 +147,7 @@ import Data.Typeable (Typeable, typeRep)
 import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
-import Control.Commander
+import Control.Monad.Commander
 
 -- | A class for interpreting command line arguments into Haskell types.
 class Typeable t => Unrender t where
