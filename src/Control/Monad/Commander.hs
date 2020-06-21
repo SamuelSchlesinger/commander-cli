@@ -1,4 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
+{- |
+Module: Control.Monad.Commander
+Description: A monad for stateful, backtracking computations
+Copyright: (c) Samuel Schlesinger 2020
+License: MIT
+Maintainer: sgschlesinger@gmail.com
+Stability: experimental
+Portability: POSIX, Windows
+-}
 module Control.Monad.Commander (
   -- ** The CommanderT Monad
   {- |
