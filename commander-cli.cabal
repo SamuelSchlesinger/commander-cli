@@ -13,6 +13,11 @@ maintainer:          sgschlesinger@gmail.com
 copyright:           2019 Samuel Schlesinger
 category:            System, CLI, Options, Parsing
 extra-source-files:  CHANGELOG.md, README.md
+tested-with:         GHC ==8.6.3 || ==8.8.3 || ==8.10.1
+
+source-repository head
+  type: git 
+  location: https://github.com/samuelschlesinger/commander-cli
 
 library
   exposed-modules:     Options.Commander, Control.Monad.Commander
