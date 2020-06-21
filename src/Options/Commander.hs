@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -170,17 +171,10 @@ unrenderSmall = flip Prelude.lookup [(pack $ show x, x) | x <- [minBound..maxBou
 instance Unrender () where
   unrender = unrenderSmall
 
-instance Unrender a => Unrender (Maybe a) where
-  unrender x = justCase x <|> nothingCase x where
-    justCase x' = do
-      x'' <- stripPrefix "Just " x'
-      return (unrender x'')
-    nothingCase x' = if x' == "Nothing" then return Nothing else Nothing
-
 instance (Unrender a, Unrender b) => Unrender (Either a b) where
   unrender x = leftCase x <|> rightCase x where
-    leftCase  = fmap Left  . unrender <=< stripPrefix "Left "
-    rightCase = fmap Right . unrender <=< stripPrefix "Right "
+    leftCase  = fmap Left  . unrender
+    rightCase = fmap Right . unrender
 
 instance Unrender Bool where
   unrender = unrenderSmall

@@ -29,7 +29,7 @@ main =
   >> envTest
   >> envOptTest
   >> envOptDefTest
-
+  >> eitherSwitchTest
 rawProg :: ProgramT Raw IO Bool
 rawProg = raw (pure True)
 
@@ -128,3 +128,24 @@ envOptDefTest = do
   testMaybeBool =<< fmap not <$> test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
   setEnv "CORPUS" "POOP"
   testMaybeBool =<< test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
+
+eitherSwitchProg :: (x -> Bool) -> (y -> Bool) -> ProgramT (Arg "xy" (Either x y) & Raw) IO (Either Bool Bool)
+eitherSwitchProg xpred ypred = arg \case { Left x -> raw (pure (Left $ xpred x)); Right y -> raw (pure (Right $ ypred y)) }
+
+eitherSwitchTest  :: IO ()
+eitherSwitchTest = do
+  let example = eitherSwitchProg (== (10 :: Int)) (== ("Hello" :: String))
+  let ploof a c = runCommanderT (run example) (State a mempty mempty) >>= c
+  ploof ["10"] \case
+    Just (Left True) -> pure ()
+    _ -> exitFailure
+  ploof ["Hello"] \case
+    Just (Right True) -> pure ()
+    _ -> exitFailure
+  ploof ["Poop"] \case
+    Just (Right False) -> pure ()
+    _ -> exitFailure
+  ploof [] \case
+    Nothing -> pure ()
+    _ -> exitFailure
+
