@@ -96,7 +96,7 @@ module Options.Commander (
     syntax for CLI programs using the 'ProgramT' data family, and defining
     the interpretation of all of the various pieces of a CLI.
   -}
-  HasProgram(run, hoist, invocations),
+  HasProgram(ProgramT, run, hoist, invocations),
   ProgramT(ArgProgramT, unArgProgramT,
            OptProgramT, unOptProgramT, unOptDefault,
            RawProgramT, unRawProgramT,
