@@ -144,6 +144,7 @@ import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Commander
+import Data.Tree
 
 -- | A class for interpreting command line arguments into Haskell types.
 class Typeable t => Unrender t where
@@ -276,6 +277,7 @@ class HasProgram p where
   run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
   invocations :: [Text]
+  description :: Forest String
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Required name t & p) where
   newtype ProgramT (Env 'Required name t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
@@ -292,6 +294,10 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Requir
     [(("(required env: " <> pack (symbolVal (Proxy @name))
     <> " :: " <> pack (show (typeRep (Proxy @t)))
     <> ") ") <>)] <*> invocations @p
+  description = [Node
+    ("required env: " <> symbolVal (Proxy @name)
+    <> " :: " <> show (typeRep (Proxy @t)))
+    (description @p)]
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Optional name t & p) where
   data ProgramT (Env 'Optional name t & p) m a = EnvProgramT'Optional
@@ -311,6 +317,10 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
     [(("(optional env: " <> pack (symbolVal (Proxy @name))
     <> " :: " <> pack (show (typeRep (Proxy @t)))
     <> ") ") <>)] <*> invocations @p
+  description = [Node
+    ("optional env: " <> symbolVal (Proxy @name)
+    <> " :: " <> show (typeRep (Proxy @t)))
+    (description @p)]
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
   newtype ProgramT (Arg name t & p) m a = ArgProgramT { unArgProgramT :: t -> ProgramT p m a }
@@ -326,12 +336,17 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
     [(("<" <> pack (symbolVal (Proxy @name))
     <> " :: " <> pack (show (typeRep (Proxy @t)))
     <> "> ") <>)] <*> invocations @p
+  description = [Node
+    ("argument: " <> symbolVal (Proxy @name)
+    <> " :: " <> show (typeRep (Proxy @t)))
+    (description @p)]
 
 instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
   data ProgramT (x + y) m a = ProgramT x m a :+: ProgramT y m a
   run (f :+: g) = run f <|> run g
   hoist n (f :+: g) = hoist n f :+: hoist n g
   invocations = invocations @x <> invocations @y
+  description = description @x <> description @y
 
 infixr 2 :+:
 
@@ -340,7 +355,7 @@ instance HasProgram Raw where
   run = liftIO . unRawProgramT
   hoist n (RawProgramT m) = RawProgramT (n m)
   invocations = [mempty]
-
+  description = []
 
 instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => HasProgram (Opt option name t & p) where
   data ProgramT (Opt option name t & p) m a = OptProgramT
@@ -359,6 +374,11 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
     <> " <" <> pack (symbolVal (Proxy @name)) 
     <> " :: " <> pack (show (typeRep (Proxy @t)))
     <> "> ") <>)  ] <*> invocations @p
+  description = [Node
+    ("option: -" <> symbolVal (Proxy @option)
+    <> symbolVal (Proxy @name)
+    <> " :: " <> show (typeRep (Proxy @t)))
+    (description @p)]
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
@@ -367,12 +387,18 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
     return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
   invocations = [(("~" <> pack (symbolVal (Proxy @flag)) <> " ") <>)] <*> invocations @p
+  description = [Node
+    ("flag: ~" <> symbolVal (Proxy @flag))
+    (description @p)]
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
   newtype ProgramT (Named name &p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
   run = run . unNamedProgramT 
   hoist n = NamedProgramT . hoist n . unNamedProgramT
   invocations = [((pack (symbolVal (Proxy @name)) <> " ") <>)] <*> invocations @p
+  description = [Node
+    ("name: " <> symbolVal (Proxy @name))
+    (description @p)]
 
 instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
   newtype ProgramT (sub & p) m a = SubProgramT { unSubProgramT :: ProgramT p m a }
@@ -386,6 +412,9 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
   hoist n = SubProgramT . hoist n . unSubProgramT
   invocations = [(pack (symbolVal (Proxy @sub) <> " ") <> )] 
             <*> invocations @p
+  description = [Node
+    ("subprogram: " <> symbolVal (Proxy @sub))
+    (description @p)]
 
 -- | A simple default for getting out the arguments, options, and flags
 -- using 'getArgs'. We use the syntax ~flag for flags and ~opt
@@ -504,7 +533,7 @@ infixr 2 <+>
 usage :: forall p m. (MonadIO m, HasProgram p) => ProgramT Raw m ()
 usage = raw $ do
   liftIO $ putStrLn "usage:"
-  void . traverse (liftIO . putStrLn . unpack) $ invocations @p
+  liftIO $ putStrLn (document @p)
 
 -- | The type of middleware, which can transform interpreted command line programs
 -- by meddling with arguments, options, or flags, or by adding effects for
@@ -543,6 +572,11 @@ withVictoryEffects ma commander = case commander of
     pure (withVictoryEffects ma commander', state')
   Defeat -> Defeat
   Victory a -> Action $ \state -> ma $> (Victory a, state)
+
+-- | Produce a 2-dimensional textual drawing of the 'Tree' description of
+-- this program.
+document :: forall p. HasProgram p => String
+document = drawForest (description @p)
 
 -- | Middleware to log the state to standard out for every step of the
 -- 'CommanderT' computation.
