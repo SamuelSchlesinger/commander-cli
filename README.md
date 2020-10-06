@@ -6,10 +6,7 @@
 This library is meant to allow Haskell programs to quickly and easily construct
 command line interfaces which are easy to use, especially as a Haskell user. To
 learn, I suggest viewing/playing with the task-manager application which
-comes with this repository. Here, we'll take on some simpler examples, and try to
-cover each combinator in the library.
-
-## Arguments
+comes with this repository. Here, we'll display a simpler example:
 
 ```haskell
 main = command_ . toplevel @"argument-taker" . arg @"example-argument" $ raw . putStrLn
@@ -59,8 +56,11 @@ name: argument-taker
 Okay, so we can expand the documentation. But what if I have an option to pass to the same program? Well, we can pass an option like so:
 
 ```
-main = command_ . toplevel @"argument-taker" $ opt @"m" @"mode" \mode -> arg @"example-argument" $ \arg -> description @"Takes the argument and prints it or not, depending on the mode" . raw $ do
-  if mode == "Print" then putStrLn arg else pure ()
+main = command_ . toplevel @"argument-taker" $
+  opt @"m" @"mode" \mode ->
+    arg @"example-argument" $ \arg ->
+      description @"Takes the argument and prints it or not, depending on the mode" . raw $ do
+        if mode == "Print" then putStrLn arg else pure ()
 ```
 
 Now, when we run `argument-taker help` we will see:
