@@ -21,32 +21,39 @@ import Data.Either
 
 type TaskManager
   = Named "task-manager"
-  & ("help" & Raw
-  + Env 'Optional "TASK_DIRECTORY" FilePath
-    & ("edit"  & TaskProgram
-     + "open"  & TaskProgram
-     + "close" & TaskProgram
-     + "tasks" & Raw
-     + "priorities" & Raw
+  & Env 'Optional "TASK_DIRECTORY" FilePath
+    & ("help"
+      & Description "Displays this help text."
+      & Raw
+     + "edit"
+      & Description "Edits an already existing task. Fails if the task does not exist."
+      & TaskProgram
+     + "open"
+      & Description "Opens a new task for editing. Fails if the task exists already."
+      & TaskProgram
+     + "close"
+      & Description "Closes a task. Fails if there are remaining priorities within the task."
+      & TaskProgram
+     + "tasks"
+      & Description "Lists current tasks."
+      & Raw
+     + "priorities" 
+      & Description "Lists priorities for every task."
+      & Raw
      + Raw
     )
-  )
 
 type TaskProgram = Arg "task-name" String & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = toplevel @"task-manager" . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
-      sub @"edit" (editTask tasksFilePath) 
-  <+> sub @"open" (newTask tasksFilePath)
-  <+> sub @"close" (closeTask tasksFilePath)
-  <+> sub @"tasks" (listTasks tasksFilePath)
-  <+> sub @"priorities" (listPriorities tasksFilePath)
-  <+> hoist describeTaskManager (usage @TaskManager)
-  where
-    describeTaskManager :: IO a -> IO a
-    describeTaskManager io = do
-      putStrLn "Welcome to the Task Manager! This is a tool to help you manage tasks, each with priorities."
-      io
+taskManager = named @"task-manager" . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
+      sub @"help" (description $ usage @TaskManager)
+  <+> sub @"edit" (description $ editTask tasksFilePath) 
+  <+> sub @"open" (description $ newTask tasksFilePath)
+  <+> sub @"close" (description $ closeTask tasksFilePath)
+  <+> sub @"tasks" (description $ listTasks tasksFilePath)
+  <+> sub @"priorities" (description $ listPriorities tasksFilePath)
+  <+> usage @TaskManager
 
 editTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
   $ withTask tasksFilePath taskName $ \Context{home} task -> callProcess "vim" [home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"]
