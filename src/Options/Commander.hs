@@ -96,7 +96,7 @@ module Options.Commander (
     syntax for CLI programs using the 'ProgramT' data family, and defining
     the interpretation of all of the various pieces of a CLI.
   -}
-  HasProgram(ProgramT, run, hoist, invocations),
+  HasProgram(ProgramT, run, hoist, documentation),
   ProgramT(ArgProgramT, unArgProgramT,
            OptProgramT, unOptProgramT, unOptDefault,
            RawProgramT, unRawProgramT,
@@ -274,14 +274,13 @@ data State = State
 -- think of 'ProgramT' as a useful syntax for command line programs, but
 -- 'CommanderT' as the semantics of that program. We also give the ability
 -- to 'hoist' 'ProgramT' actions between monads if you can uniformly turn
--- computations in one into another. All of the different 'invocations'
--- are also stored to give a primitive form of automatically generated
--- documentation.
+-- computations in one into another. We also store 'documentation' in the
+-- form of a @'Forest' 'String'@, in order to automatically generate
+-- 'usage' programs.
 class HasProgram p where
   data ProgramT p (m :: * -> *) a
   run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
-  invocations :: [Text]
   documentation :: Forest String
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Required name t & p) where
@@ -295,10 +294,6 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Requir
           Nothing -> return (Defeat, state)
       Nothing -> return (Defeat, state)
   hoist n (EnvProgramT'Required f) = EnvProgramT'Required (hoist n . f)
-  invocations =
-    [(("(required env: " <> pack (symbolVal (Proxy @name))
-    <> " :: " <> pack (show (typeRep (Proxy @t)))
-    <> ") ") <>)] <*> invocations @p
   documentation = [Node
     ("required env: " <> symbolVal (Proxy @name)
     <> " :: " <> show (typeRep (Proxy @t)))
@@ -318,10 +313,6 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
       Nothing -> return (run (unEnvProgramT'Optional f (unEnvDefault f)), state)
 
   hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
-  invocations =
-    [(("(optional env: " <> pack (symbolVal (Proxy @name))
-    <> " :: " <> pack (show (typeRep (Proxy @t)))
-    <> ") ") <>)] <*> invocations @p
   documentation = [Node
     ("optional env: " <> symbolVal (Proxy @name)
     <> " :: " <> show (typeRep (Proxy @t)))
@@ -337,10 +328,6 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
           Nothing -> return (Defeat, State{..})
       [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
-  invocations =
-    [(("<" <> pack (symbolVal (Proxy @name))
-    <> " :: " <> pack (show (typeRep (Proxy @t)))
-    <> "> ") <>)] <*> invocations @p
   documentation = [Node
     ("argument: " <> symbolVal (Proxy @name)
     <> " :: " <> show (typeRep (Proxy @t)))
@@ -350,7 +337,6 @@ instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
   data ProgramT (x + y) m a = ProgramT x m a :+: ProgramT y m a
   run (f :+: g) = run f <|> run g
   hoist n (f :+: g) = hoist n f :+: hoist n g
-  invocations = invocations @x <> invocations @y
   documentation = documentation @x <> documentation @y
 
 infixr 2 :+:
@@ -359,7 +345,6 @@ instance HasProgram Raw where
   newtype ProgramT Raw m a = RawProgramT { unRawProgramT :: m a }
   run = liftIO . unRawProgramT
   hoist n (RawProgramT m) = RawProgramT (n m)
-  invocations = [mempty]
   documentation = []
 
 instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => HasProgram (Opt option name t & p) where
@@ -374,11 +359,6 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
           Nothing -> return (Defeat, State{..})
       Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
-  invocations =
-    [(("-" <> pack (symbolVal (Proxy @option)) 
-    <> " <" <> pack (symbolVal (Proxy @name)) 
-    <> " :: " <> pack (show (typeRep (Proxy @t)))
-    <> "> ") <>)  ] <*> invocations @p
   documentation = [Node
     ("option: -" <> symbolVal (Proxy @option)
     <> symbolVal (Proxy @name)
@@ -391,7 +371,6 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
     let presence = HashSet.member (pack (symbolVal (Proxy @flag))) flags
     return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
-  invocations = [(("~" <> pack (symbolVal (Proxy @flag)) <> " ") <>)] <*> invocations @p
   documentation = [Node
     ("flag: ~" <> symbolVal (Proxy @flag))
     (documentation @p)]
@@ -400,7 +379,6 @@ instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
   newtype ProgramT (Named name &p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
   run = run . unNamedProgramT 
   hoist n = NamedProgramT . hoist n . unNamedProgramT
-  invocations = [((pack (symbolVal (Proxy @name)) <> " ") <>)] <*> invocations @p
   documentation = [Node
     ("name: " <> symbolVal (Proxy @name))
     (documentation @p)]
@@ -409,7 +387,6 @@ instance (KnownSymbol description, HasProgram p) => HasProgram (Description desc
   newtype ProgramT (Description description &p) m a = DescriptionProgramT { unDescriptionProgramT :: ProgramT p m a }
   run = run . unDescriptionProgramT 
   hoist n = DescriptionProgramT . hoist n . unDescriptionProgramT
-  invocations = invocations @p
   documentation = [Node
     ("description: " <> symbolVal (Proxy @description))
     []] <> documentation @p
@@ -424,8 +401,6 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
           else return (Defeat, State{..})
       [] -> return (Defeat, State{..})
   hoist n = SubProgramT . hoist n . unSubProgramT
-  invocations = [(pack (symbolVal (Proxy @sub) <> " ") <> )] 
-            <*> invocations @p
   documentation = [Node
     ("subprogram: " <> symbolVal (Proxy @sub))
     (documentation @p)]
