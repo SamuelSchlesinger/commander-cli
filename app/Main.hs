@@ -162,4 +162,16 @@ initializeOrFetch tasksFilePath = do
       False -> Context home [] <$ createDirectory tasksFilePath
   
 main :: IO ()
-main = command_ taskManager
+main = command_ . toplevel @"file" $
+ (sub @"maybe-read" $
+  arg @"filename" \filename ->
+  flag @"read" \b -> raw $
+    if b
+      then putStrLn =<< readFile filename
+      else pure ())
+  <+>
+ (sub @"maybe-write" $
+  opt @"file" @"file-to-write" \mfilename -> raw $
+    case mfilename of
+      Just filename -> putStrLn =<< readFile filename
+      Nothing -> pure ())

@@ -51,9 +51,19 @@ If I run this program with the argument help, it will output:
 
 @
 usage:
-file help
-file maybe-read \<filename :: String\> ~read
-file maybe-write -file \<file-to-write :: String\>
+name: file
+|
++- subprogram: help
+|
++- subprogram: maybe-read
+|  |
+|  `- argument: filename :: [Char]
+|     |
+|     `- flag: ~read
+|
+`- subprogram: maybe-write
+   |
+   `- option: -file <file-to-write :: [Char]>
 @
 
 The point of this library is mainly so that you can write command line
@@ -525,6 +535,9 @@ usage = raw $ do
   liftIO $ putStrLn "usage:"
   liftIO $ putStrLn (document @p)
 
+-- | A combinator which takes a program, and a type-level 'Symbol'
+-- description of that program, and produces a program here the
+-- documentation is annotated with the given description.
 description :: forall description p m a. (HasProgram p, KnownSymbol description) => ProgramT p m a -> ProgramT (Description description & p) m a
 description = DescriptionProgramT
 
