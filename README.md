@@ -5,124 +5,80 @@
 
 This library is meant to allow Haskell programs to quickly and easily construct
 command line interfaces which are easy to use, especially as a Haskell user. To
-begin, I suggest viewing/playing with the task-manager application which
-comes with this repository. Here is its type level description:
+learn, I suggest viewing/playing with the task-manager application which
+comes with this repository. Here, we'll take on some simpler examples, and try to
+cover each combinator in the library.
+
+## Arguments
 
 ```haskell
-type TaskProgram = Arg "task-name" String & Raw
-
-type TaskManager
-  = Named "task-manager"
-  & Env 'Optional "TASK_DIRECTORY" FilePath
-    & ("help"
-      & Description "Displays this help text."
-      & Raw
-     + "edit"
-      & Description "Edits an already existing task. Fails if the task does not exist."
-      & TaskProgram
-     + "open"
-      & Description "Opens a new task for editing. Fails if the task exists already."
-      & TaskProgram
-     + "close"
-      & Description "Closes a task. Fails if there are remaining priorities within the task."
-      & TaskProgram
-     + "tasks"
-      & Description "Lists current tasks."
-      & Raw
-     + "priorities" 
-      & Description "Lists priorities for every task."
-      & Raw
-     + Raw
-    )
+main = command_ . toplevel @"argument-taker" . arg @"example-argument" $ raw . putStrLn
 ```
 
-The usage documentation for this description is displayed as:
+When you run this program with `argument-taker help`, you will see:
 
 ```
 usage:
-name: task-manager
+name: argument-taker
 |
-`- optional env: TASK_DIRECTORY :: [Char]
-   |
-   +- subprogram: help
-   |  |
-   |  `- description: Displays this help text.
-   |
-   +- subprogram: edit
-   |  |
-   |  +- description: Edits an already existing task. Fails if the task does not exist.
-   |  |
-   |  `- argument: task-name :: [Char]
-   |
-   +- subprogram: open
-   |  |
-   |  +- description: Opens a new task for editing. Fails if the task exists already.
-   |  |
-   |  `- argument: task-name :: [Char]
-   |
-   +- subprogram: close
-   |  |
-   |  +- description: Closes a task. Fails if there are remaining priorities within the task.
-   |  |
-   |  `- argument: task-name :: [Char]
-   |
-   +- subprogram: tasks
-   |  |
-   |  `- description: Lists current tasks.
-   |
-   `- subprogram: priorities
-      |
-      `- description: Lists priorities for every task.
++- subprogram: help
+|
+`- argument: example-argument :: [Char]
 ```
 
-The actual program is defined as:
+The meaning of this is that every path in the tree is a unique command. The one
+we've used is the help command. If we run this program with `argument-taker hello`
+we will see:
+
+```
+hello
+```
+
+Okay, so we've made a program with hardly any scaffolding that gives us a
+decent help message, and pipes through our argument correctly. Naturally, we
+might want to expand on the documentation of this program, as its not quite
+obvious enough what it does.
+
+```
+main = command_ . toplevel @"argument-taker" . arg @"example-argument" $ (description @"Takes the argument and prints it" . raw . putStrLn)
+```
+
+Printing out the documentation again with `argument-taker help`, we see:
 
 ```haskell
-taskManager :: ProgramT TaskManager IO ()
-taskManager = named @"task-manager" . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
-      sub @"help" (description $ usage @TaskManager)
-  <+> sub @"edit" (description $ editTask tasksFilePath) 
-  <+> sub @"open" (description $ newTask tasksFilePath)
-  <+> sub @"close" (description $ closeTask tasksFilePath)
-  <+> sub @"tasks" (description $ listTasks tasksFilePath)
-  <+> sub @"priorities" (description $ listPriorities tasksFilePath)
-  <+> usage @TaskManager
-  where
-    editTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
-      $ withTask tasksFilePath taskName $ \Context{home} task -> callProcess "vim" [home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"]
-
-    newTask tasksFilePath = arg @"task-name" $ \taskName -> raw $ do
-      Context{home, tasks} <- initializeOrFetch tasksFilePath
-      if not (taskName `elem` tasks)
-        then do
-          let path = home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"
-          callProcess "touch" [path]
-          appendFile path (renderPriorities $ [])
-          callProcess "vim" [path]
-        else putStrLn $ "task " ++ taskName ++ " already exists."
-
-    closeTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
-      $ withTask tasksFilePath taskName $ \Context{home, tasks} mtask ->
-        case mtask of
-          Just Task{priorities} ->
-            if priorities == [] 
-              then removeFile (home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task")
-              else putStrLn $ "task " ++ taskName ++ " has remaining priorities."
-          Nothing -> putStrLn "task is corrupted"
-
-    listTasks tasksFilePath = raw $ do
-      Context{tasks} <- initializeOrFetch tasksFilePath
-      mapM_ putStrLn tasks
-
-    listPriorities tasksFilePath = raw $ do
-      Context{tasks} <- initializeOrFetch tasksFilePath
-      forM_ tasks $ \taskName -> withTask tasksFilePath taskName $ \_ mtask -> 
-        case mtask of
-          Just Task{name, priorities} -> do
-            putStrLn $ name ++ ": "
-            putStrLn $ renderPriorities priorities
-          Nothing -> putStrLn $ "Corruption! Task " ++ taskName ++ " is the culprint"
+usage:
+name: argument-taker
+|
++- subprogram: help
+|
+`- argument: example-argument :: [Char]
+   |
+   `- description: Takes the argument and prints it
 ```
+
+Okay, so we can expand the documentation. But what if I have an option to pass to the same program? Well, we can pass an option like so:
+
+```
+main = command_ . toplevel @"argument-taker" $ opt @"m" @"mode" \mode -> arg @"example-argument" $ \arg -> description @"Takes the argument and prints it or not, depending on the mode" . raw $ do
+  if mode == "Print" then putStrLn arg else pure ()
+```
+
+Now, when we run `argument-taker help` we will see:
+
+```
+usage:
+name: argument-taker
+|
++- subprogram: help
+|
+`- option: -m <mode :: [Char]>
+   |
+   `- argument: example-argument :: [Char]
+      |
+      `- description: Takes the argument and prints it or not, depending on the mode
+```
+
+## Design
 
 The library is based around the following classes:
 

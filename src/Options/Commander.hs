@@ -361,8 +361,9 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   documentation = [Node
     ("option: -" <> symbolVal (Proxy @option)
-    <> symbolVal (Proxy @name)
-    <> " :: " <> show (typeRep (Proxy @t)))
+    <> " <" <> symbolVal (Proxy @name)
+    <> " :: " <> show (typeRep (Proxy @t))
+    <> ">")
     (documentation @p)]
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
