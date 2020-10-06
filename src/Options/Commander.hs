@@ -407,7 +407,7 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
     (documentation @p)]
 
 -- | A simple default for getting out the arguments, options, and flags
--- using 'getArgs'. We use the syntax ~flag for flags and ~opt
+-- using 'getArgs'. We use the syntax ~flag for flags and -opt
 -- for options, with arguments using the typical ordered representation.
 initialState :: IO State
 initialState = do
