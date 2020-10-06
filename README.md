@@ -6,17 +6,43 @@
 This library is meant to allow Haskell programs to quickly and easily construct
 command line interfaces which are easy to use, especially as a Haskell user. To
 begin, I suggest viewing/playing with the task-manager application which
-comes with this repository. Its usage info is generated as:
+comes with this repository. Its documentation is displayed as:
 
-```bash
+```
 usage:
-task-manager help
-task-manager (required env: TASK_DIRECTORY :: [Char]) edit <task-name :: [Char]>
-task-manager (required env: TASK_DIRECTORY :: [Char]) open <task-name :: [Char]>
-task-manager (required env: TASK_DIRECTORY :: [Char]) close <task-name :: [Char]>
-task-manager (required env: TASK_DIRECTORY :: [Char]) tasks
-task-manager (required env: TASK_DIRECTORY :: [Char]) priorities
-task-manager (required env: TASK_DIRECTORY :: [Char])
+name: task-manager
+|
+`- optional env: TASK_DIRECTORY :: [Char]
+   |
+   +- subprogram: help
+   |  |
+   |  `- description: Displays this help text.
+   |
+   +- subprogram: edit
+   |  |
+   |  +- description: Edits an already existing task. Fails if the task does not exist.
+   |  |
+   |  `- argument: task-name :: [Char]
+   |
+   +- subprogram: open
+   |  |
+   |  +- description: Opens a new task for editing. Fails if the task exists already.
+   |  |
+   |  `- argument: task-name :: [Char]
+   |
+   +- subprogram: close
+   |  |
+   |  +- description: Closes a task. Fails if there are remaining priorities within the task.
+   |  |
+   |  `- argument: task-name :: [Char]
+   |
+   +- subprogram: tasks
+   |  |
+   |  `- description: Lists current tasks.
+   |
+   `- subprogram: priorities
+      |
+      `- description: Lists priorities for every task.
 ```
 
 
@@ -35,7 +61,7 @@ class HasProgram p where
   data ProgramT p m a
   run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
-  invocations :: [Text]
+  documentation :: Forest String
 ```
 
 Instances of this class will define a syntactic element, a new instance of the
