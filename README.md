@@ -3,13 +3,49 @@
 [![Hackage](https://img.shields.io/hackage/v/commander-cli.svg)](https://hackage.haskell.org/package/commander-cli)
 [![Build Status](https://travis-ci.org/SamuelSchlesinger/commander-cli.svg?branch=master)](https://travis-ci.org/SamuelSchlesinger/commander-cli)
 
-This library is meant to allow Haskell programs to quickly and easily construct
-command line interfaces which are easy to use, especially as a Haskell user. To
-learn, I suggest viewing/playing with the task-manager application which
-comes with this repository. Here, we'll display a simpler example:
+This library is meant to allow Haskell programmers to quickly and easily construct
+command line interfaces with decent documentation.
+
+One extension I use in these examples is `-XTypeApplications`, which uses the `@param`
+syntax to apply an type-level argument explicitly to a function with a `forall x ...` in its
+type, rather than implicitly, we do when we write `fmap (+ 1) [1, 2, 3]` applying the type `[]`
+to `fmap`. It's because of type inference in Haskell that we don't always have to apply our
+types explicitly, as many other languages force you to do using a syntax typically like `fmap<[], Int> (+ 1) [1, 2, 3]`.`.
+
+We can go to the command line and try out this example:
+
+```
+> :set -XTypeApplications
+> :t fmap @[]
+fmap @[] :: (a -> b) -> [a] -> [b]
+> :t fmap @[] @Int
+fmap @[] @Int :: (Int -> b) -> [Int] -> [b]
+> :t fmap @[] @Int @Bool
+fmap @[] @Int @Bool :: (Int -> Bool) -> [Int] -> [Bool]
+```
+
+The API of `commander-cli` allows for very profitable usage of type
+applications, because the description of our command line program will live
+at the type level. 
+
+Another extension we will use is `-XDataKinds`, which is only for the ability
+to use strings, or the kind `Symbol`, at the type level. Kinds are just the
+type of types, and so `-XDataKinds` allows us to have kinds which are actually
+data in their own right, like lists, strings, numbers, and custom Haskell
+data types. For us, we will use strings to represent the documentation of our
+program at the type level, as well as the names of options, flags, and arguments
+we want to parse. This allows us to generate documentation programs simply from
+the type signature of the CLI program we build.
+
+Our first example will show a basic command line application,
+complete with help messages that display reasonable messages to the user.
 
 ```haskell
-main = command_ . toplevel @"argument-taker" . arg @"example-argument" $ raw . putStrLn
+main = command_
+  . toplevel @"argument-taker"
+  . arg @"example-argument" $ \arg ->
+    raw $ do
+      putStrLn arg
 ```
 
 When you run this program with `argument-taker help`, you will see:
@@ -23,21 +59,24 @@ name: argument-taker
 `- argument: example-argument :: [Char]
 ```
 
-The meaning of this is that every path in the tree is a unique command. The one
-we've used is the help command. If we run this program with `argument-taker hello`
+The meaning of this documentation is that every path in the tree is a unique command.
+The one we've used is the help command. If we run this program with `argument-taker hello`
 we will see:
 
 ```
 hello
 ```
 
-Okay, so we've made a program with hardly any scaffolding that gives us a
-decent help message, and pipes through our argument correctly. Naturally, we
-might want to expand on the documentation of this program, as its not quite
+Naturally, we might want to expand on the documentation of this program, as its not quite
 obvious enough what it does.
 
-```
-main = command_ . toplevel @"argument-taker" . arg @"example-argument" $ (description @"Takes the argument and prints it" . raw . putStrLn)
+```haskell
+main = command_
+  . toplevel @"argument-taker"
+  . arg @"example-argument" $ \arg ->
+    description @"Takes the argument and prints it"
+  . raw $ do
+      putStrLn arg
 ```
 
 Printing out the documentation again with `argument-taker help`, we see:
@@ -55,12 +94,14 @@ name: argument-taker
 
 Okay, so we can expand the documentation. But what if I have an option to pass to the same program? Well, we can pass an option like so:
 
-```
-main = command_ . toplevel @"argument-taker" $
-  opt @"m" @"mode" \mode ->
+```haskell
+main = command_
+  . toplevel @"argument-taker"
+  . optDef @"m" @"mode" "Print" $ \mode ->
     arg @"example-argument" $ \arg ->
-      description @"Takes the argument and prints it or not, depending on the mode" . raw $ do
-        if mode == "Print" then putStrLn arg else pure ()
+    description @"Takes the argument and prints it or not, depending on the mode" 
+  . raw $ do
+      if mode == "Print" then putStrLn arg else pure ()
 ```
 
 Now, when we run `argument-taker help` we will see:
@@ -76,6 +117,176 @@ name: argument-taker
    `- argument: example-argument :: [Char]
       |
       `- description: Takes the argument and prints it or not, depending on the mode
+```
+
+Okay! So we can now create programs which take arguments and options, so what
+else do we want in a command line program? Flags! Lets add a flag to our
+example program:
+
+```haskell
+main = command_
+  . toplevel @"argument-taker"
+  . optDef @"m" @"mode" "Print" $ \mode ->
+    arg @"example-argument" $ \arg ->
+    flag @"loud" $ \loud ->
+    description @"Takes the argument and prints it or not, depending on the mode" 
+  . raw $ do
+      let msg = if loud then map toUpper arg <> "!" else arg
+      if mode == "Print" then putStrLn msg else pure ()
+```
+
+Running this with `argument-taker help`, we see:
+
+```
+usage:
+name: argument-taker
+|
++- subprogram: help
+|
+`- option: -m <mode :: [Char]>
+   |
+   `- argument: example-argument :: [Char]
+      |
+      `- flag: ~loud
+         |
+         `- description: Takes the argument and prints it or not, depending on the mode
+```
+
+Okay, so we've added all of the normal command line things, but we haven't yet shown how to add a new command
+to our program, so lets do that. To do this, we can write:
+
+```haskell
+main = command_
+  . toplevel @"argument-taker"
+  $ defaultProgram <+> sub @"shriek" (raw (putStrLn "AHHHHH!!"))
+  where
+  defaultProgram = 
+      optDef @"m" @"mode" "Print" $ \mode ->
+      arg @"example-argument" $ \arg ->
+      flag @"loud" $ \loud ->
+      description @"Takes the argument and prints it or not, depending on the mode" 
+    . raw $ do
+        let msg = if loud then map toUpper arg <> "!" else arg
+        if mode == "Print" then putStrLn msg else pure ()
+```
+
+Running this program with `argument-taker help`, we can see the docs yet again:
+
+```
+usage:
+name: argument-taker
+|
++- subprogram: help
+|
++- option: -m <mode :: [Char]>
+|  |
+|  `- argument: example-argument :: [Char]
+|     |
+|     `- flag: ~loud
+|        |
+|        `- description: Takes the argument and prints it or not, depending on the mode
+|
+`- subprogram: shriek
+```
+
+Awesome! So we have now shown how to use the primitives of CLI programs, as well as how to
+add new subprograms. One more thing I would like to show that is different from normal CLI
+libraries is that I added the ability to automatically search for environment variables and
+pass them to your program. I just liked this, as sometimes when I use a CLI program I forget
+this or that environment variable, and the documentation generation makes this self documenting
+in commander-cli. We can add this to our program by writing:
+
+```haskell
+main = command_
+  . toplevel @"argument-taker"
+  $ env @"ARGUMENT_TAKER_DIRECTORY" \argumentTakerDirectory ->
+      defaultProgram argumentTakerDirectory
+  <+> sub @"shriek" (raw $ do
+        setCurrentDirectory argumentTakerDirectory 
+        putStrLn "AHHH!"
+      )
+  where
+  defaultProgram argumentTakerDirectory = 
+      optDef @"m" @"mode" "Print" $ \mode ->
+      arg @"example-argument" $ \arg ->
+      flag @"loud" $ \loud ->
+      description @"Takes the argument and prints it or not, depending on the mode" 
+    . raw $ do
+        setCurrentDirectory argumentTakerDirectory
+        let msg = if loud then map toUpper arg <> "!" else arg
+        if mode == "Print" then putStrLn msg else pure ()
+```
+
+Now, we will see `argument-taker help` as:
+
+```
+usage:
+name: argument-taker
+|
++- subprogram: help
+|
+`- required env: ARGUMENT_TAKER_DIRECTORY :: [Char]
+   |
+   +- option: -m <mode :: [Char]>
+   |  |
+   |  `- argument: example-argument :: [Char]
+   |     |
+   |     `- flag: ~loud
+   |        |
+   |        `- description: Takes the argument and prints it or not, depending on the mode
+   |
+   `- subprogram: shriek
+```
+
+We can see that it documents the usage of this environment variable in a
+reasonable way, but its not clear where exactly what it does exactly. First,
+you might think to use the `description` combinator, but it isn't exactly made
+for describing an input, but for documenting a path of a program. We can fix this
+using the `annotated` combinator, which was made for describing inputs to our
+program:
+
+```haskell
+main :: IO ()
+main = command_
+  . toplevel @"argument-taker"
+  . annotated @"the directory we will go to for the program"
+  $ env @"ARGUMENT_TAKER_DIRECTORY" \argumentTakerDirectory ->
+      defaultProgram argumentTakerDirectory
+  <+> sub @"shriek" (raw $ do
+        setCurrentDirectory argumentTakerDirectory 
+        putStrLn "AHHH!"
+      )
+  where
+  defaultProgram argumentTakerDirectory = 
+      optDef @"m" @"mode" "Print" $ \mode ->
+      arg @"example-argument" $ \arg ->
+      flag @"loud" $ \loud ->
+      description @"Takes the argument and prints it or not, depending on the mode" 
+    . raw $ do
+        setCurrentDirectory argumentTakerDirectory
+        let msg = if loud then map toUpper arg <> "!" else arg
+        if mode == "Print" then putStrLn msg else pure ()
+```
+
+Running `argument-taker help` will result in:
+
+```
+usage:
+name: argument-taker
+|
++- subprogram: help
+|
+`- required env: ARGUMENT_TAKER_DIRECTORY :: [Char], the directory we will go to for the program
+   |
+   +- option: -m <mode :: [Char]>
+   |  |
+   |  `- argument: example-argument :: [Char]
+   |     |
+   |     `- flag: ~loud
+   |        |
+   |        `- description: Takes the argument and prints it or not, depending on the mode
+   |
+   `- subprogram: shriek
 ```
 
 ## Design

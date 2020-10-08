@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeOperators #-}
 module Main where
 
+import Data.Char (toUpper)
 import Control.Monad
 import Options.Commander 
 import Prelude
@@ -18,6 +19,7 @@ import System.Process hiding (env)
 import Data.List
 import Text.Read
 import System.Exit
+import System.Directory (setCurrentDirectory)
 import Data.Either
 
 type TaskManager
@@ -162,16 +164,4 @@ initializeOrFetch tasksFilePath = do
       False -> Context home [] <$ createDirectory tasksFilePath
   
 main :: IO ()
-main = command_ . toplevel @"file" $
- (sub @"maybe-read" $
-  arg @"filename" \filename ->
-  flag @"read" \b -> raw $
-    if b
-      then putStrLn =<< readFile filename
-      else pure ())
-  <+>
- (sub @"maybe-write" $
-  opt @"file" @"file-to-write" \mfilename -> raw $
-    case mfilename of
-      Just filename -> putStrLn =<< readFile filename
-      Nothing -> pure ())
+main = command_ taskManager

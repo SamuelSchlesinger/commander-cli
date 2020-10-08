@@ -88,7 +88,7 @@ module Options.Commander (
     variables as well. We also have a convenience combinator, 'toplevel',
     which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description,
+  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
   -- ** Run CLI Programs
   {- |
     To run a 'ProgramT' (a specification of a CLI program), you will 
@@ -99,7 +99,7 @@ module Options.Commander (
     Each 'ProgramT' has a type level description, build from these type level
     combinators.
   -}
-  type (&), type (+), Arg, Opt, Named, Raw, Flag, Env, Optionality(Required, Optional), Description,
+  type (&), type (+), Arg, Opt, Named, Raw, Flag, Env, Optionality(Required, Optional), Description, Annotated,
   -- ** Interpreting CLI Programs
   {- |
     The 'HasProgram' class forms the backbone of this library, defining the
@@ -116,6 +116,7 @@ module Options.Commander (
            EnvProgramT'Optional, unEnvProgramT'Optional, unEnvDefault,
            EnvProgramT'Required, unEnvProgramT'Required,
            DescriptionProgramT,
+           AnnotatedProgramT,
            (:+:)
            ),
   -- ** The CommanderT Monad
@@ -221,35 +222,38 @@ deriving via WrappedNatural Word64 instance Unrender Word64
 instance Unrender Char where
   unrender = find (const True)
 
--- | The type level naming combinator, giving your program a name for the
--- sake of documentation.
+-- | The type level combinator for constructing 'named' programs, giving your
+-- program a name at the toplevel for the sake of documentation.
 data Named :: Symbol -> *
 
--- | The type level argument combinator, with a 'Symbol' designating the
+-- | The type level 'arg'ument combinator, with a 'Symbol' designating the
 -- name of that argument.
 data Arg :: Symbol -> * -> *
 
--- | The type level option combinator, with a 'Symbol' designating the
+-- | The type level 'opt'ion combinator, with a 'Symbol' designating the
 -- option's name and another representing the metavariables name for
 -- documentation purposes.
 data Opt :: Symbol -> Symbol -> * -> *
 
--- | The type level flag combinator, taking a name as input, allowing your
+-- | The type level 'flag' combinator, taking a name as input, allowing your
 -- program to take flags with the syntax @~flag@.
 data Flag :: Symbol -> *
 
--- | The type level environment variable combinator, taking a name as
+-- | The type level 'env'ironment variable combinator, taking a name as
 -- input, allowing your program to take environment variables as input
 -- automatically.
 data Env :: Optionality -> Symbol -> * -> *
 
--- | The type level raw monadic program combinator, allowing a command line
+-- | The type level 'raw' monadic program combinator, allowing a command line
 -- program to just do some computation.
 data Raw :: *
 
--- | The type level description combinator, allowing a command line program
+-- | The type level 'description' combinator, allowing a command line program
 -- to have better documentation.
 data Description :: Symbol -> *
+
+-- | The type level 'annotated' combinator, allowing a command line 
+data Annotated :: Symbol -> * -> *
 
 -- | The type level tag for whether or not a variable is required or not.
 data Optionality = Required | Optional
@@ -387,7 +391,7 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
     (documentation @p)]
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
-  newtype ProgramT (Named name &p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
+  newtype ProgramT (Named name & p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
   run = run . unNamedProgramT 
   hoist n = NamedProgramT . hoist n . unNamedProgramT
   documentation = [Node
@@ -395,12 +399,18 @@ instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
     (documentation @p)]
 
 instance (KnownSymbol description, HasProgram p) => HasProgram (Description description & p) where
-  newtype ProgramT (Description description &p) m a = DescriptionProgramT { unDescriptionProgramT :: ProgramT p m a }
+  newtype ProgramT (Description description & p) m a = DescriptionProgramT { unDescriptionProgramT :: ProgramT p m a }
   run = run . unDescriptionProgramT 
   hoist n = DescriptionProgramT . hoist n . unDescriptionProgramT
   documentation = [Node
     ("description: " <> symbolVal (Proxy @description))
     []] <> documentation @p
+
+instance (KnownSymbol annotation, HasProgram (combinator & p)) => HasProgram (Annotated annotation combinator & p) where
+  newtype ProgramT (Annotated annotation combinator & p) m a = AnnotatedProgramT { unAnnotatedProgramT :: ProgramT (combinator & p) m a }
+  run = run . unAnnotatedProgramT 
+  hoist n = AnnotatedProgramT . hoist n . unAnnotatedProgramT
+  documentation = fmap (\(Node x s) -> Node (x <> ", " <> symbolVal (Proxy @annotation)) s) (documentation @(combinator & p))
 
 instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
   newtype ProgramT (sub & p) m a = SubProgramT { unSubProgramT :: ProgramT p m a }
@@ -534,6 +544,11 @@ usage :: forall p m. (MonadIO m, HasProgram p) => ProgramT Raw m ()
 usage = raw $ do
   liftIO $ putStrLn "usage:"
   liftIO $ putStrLn (document @p)
+
+-- | A combinator which augments the documentation of the next element, by
+-- adding a description after its name and type.
+annotated :: forall annotation combinator p m a. ProgramT (combinator & p) m a -> ProgramT (Annotated annotation combinator & p) m a
+annotated = AnnotatedProgramT
 
 -- | A combinator which takes a program, and a type-level 'Symbol'
 -- description of that program, and produces a program here the
