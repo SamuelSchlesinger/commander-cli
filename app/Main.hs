@@ -1,3 +1,4 @@
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -28,25 +29,17 @@ type TaskManager
     & ("help"
       & Description "Displays this help text."
       & Raw
-     + "edit"
-      & Description "Edits an already existing task. Fails if the task does not exist."
-      & TaskProgram "edit"
-     + "open"
-      & Description "Opens a new task for editing. Fails if the task exists already."
-      & TaskProgram "open"
-     + "close"
-      & Description "Closes a task. Fails if there are remaining priorities within the task."
-      & TaskProgram "close"
-     + "tasks"
-      & Description "Lists current tasks."
-      & Raw
-     + "priorities" 
-      & Description "Lists priorities for every task."
-      & Raw
+     + TaskProgram "edit" "Edits an already existing task. Fails if the task does not exist."
+     + TaskProgram "open" "Opens a new task for editing. Fails if the task exists already."
+     + TaskProgram "close" "Closes a task. Fails if there are remaining priorities within the task."
+     + TasklessProgram "tasks" "Lists current tasks."
+     + TasklessProgram "priorities" "Lists priorities for every task."
      + Raw
     )
 
-type TaskProgram x = Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
+type TaskProgram x desc = x & Description desc & Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
+
+type TasklessProgram x desc = x & Description desc & Raw
   
 taskManager :: ProgramT TaskManager IO ()
 taskManager = named @"task-manager" . annotated . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
