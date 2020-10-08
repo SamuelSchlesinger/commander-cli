@@ -6,11 +6,12 @@
 This library is meant to allow Haskell programmers to quickly and easily construct
 command line interfaces with decent documentation.
 
-One extension I use in these examples is `-XTypeApplications`, which uses the `@param`
+One extension I use in these examples is `-XTypeApplications`. This extension allows us to use the `@param`
 syntax to apply an type-level argument explicitly to a function with a `forall x ...` in its
-type, rather than implicitly, we do when we write `fmap (+ 1) [1, 2, 3]` applying the type `[]`
-to `fmap`. It's because of type inference in Haskell that we don't always have to apply our
-types explicitly, as many other languages force you to do using a syntax typically like `fmap<[], Int> (+ 1) [1, 2, 3]`.`.
+type. This is as opposed to implicitly applying type-level arguments, as we do when we write
+`fmap (+ 1) [1, 2, 3]`, applying the type `[]` to `fmap`. It's because of type inference in Haskell
+that we don't always have to apply our types explicitly, as many other languages force you to do using
+a syntax typically like `fmap<[], Int> (+ 1) [1, 2, 3]`.`.
 
 We can go to the command line and try out this example:
 
