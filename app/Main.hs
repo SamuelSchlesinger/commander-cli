@@ -19,7 +19,6 @@ import System.Process hiding (env)
 import Data.List
 import Text.Read
 import System.Exit
-import System.Directory (setCurrentDirectory)
 import Data.Either
 
 type TaskManager
