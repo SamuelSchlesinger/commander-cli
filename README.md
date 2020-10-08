@@ -129,7 +129,7 @@ main = command_
   . optDef @"m" @"mode" "Print" $ \mode ->
     arg @"example-argument" $ \arg ->
     flag @"loud" $ \loud ->
-    description @"Takes the argument and prints it or not, depending on the mode" 
+    description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
   . raw $ do
       let msg = if loud then map toUpper arg <> "!" else arg
       if mode == "Print" then putStrLn msg else pure ()
@@ -149,7 +149,7 @@ name: argument-taker
       |
       `- flag: ~loud
          |
-         `- description: Takes the argument and prints it or not, depending on the mode
+         `- description: Takes the argument and prints it or not, depending on the mode and possibly loudly
 ```
 
 Okay, so we've added all of the normal command line things, but we haven't yet shown how to add a new command
@@ -164,7 +164,7 @@ main = command_
       optDef @"m" @"mode" "Print" $ \mode ->
       arg @"example-argument" $ \arg ->
       flag @"loud" $ \loud ->
-      description @"Takes the argument and prints it or not, depending on the mode" 
+      description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
     . raw $ do
         let msg = if loud then map toUpper arg <> "!" else arg
         if mode == "Print" then putStrLn msg else pure ()
@@ -184,7 +184,7 @@ name: argument-taker
 |     |
 |     `- flag: ~loud
 |        |
-|        `- description: Takes the argument and prints it or not, depending on the mode
+|        `- description: Takes the argument and prints it or not, depending on the mode and possibly loudly
 |
 `- subprogram: shriek
 ```
@@ -210,7 +210,7 @@ main = command_
       optDef @"m" @"mode" "Print" $ \mode ->
       arg @"example-argument" $ \arg ->
       flag @"loud" $ \loud ->
-      description @"Takes the argument and prints it or not, depending on the mode" 
+      description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
     . raw $ do
         setCurrentDirectory argumentTakerDirectory
         let msg = if loud then map toUpper arg <> "!" else arg
@@ -233,7 +233,7 @@ name: argument-taker
    |     |
    |     `- flag: ~loud
    |        |
-   |        `- description: Takes the argument and prints it or not, depending on the mode
+   |        `- description: Takes the argument and prints it or not, depending on the mode and possibly loudly
    |
    `- subprogram: shriek
 ```
