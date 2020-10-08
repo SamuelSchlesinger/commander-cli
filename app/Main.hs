@@ -20,22 +20,23 @@ import Data.List
 import Text.Read
 import System.Exit
 import Data.Either
+import GHC.TypeLits (AppendSymbol)
 
 type TaskManager
   = Named "task-manager"
-  & Env 'Optional "TASK_DIRECTORY" FilePath
+  & Annotated "the directory in which we keep our task files" (Env 'Optional "TASK_DIRECTORY" FilePath)
     & ("help"
       & Description "Displays this help text."
       & Raw
      + "edit"
       & Description "Edits an already existing task. Fails if the task does not exist."
-      & TaskProgram
+      & TaskProgram "edit"
      + "open"
       & Description "Opens a new task for editing. Fails if the task exists already."
-      & TaskProgram
+      & TaskProgram "open"
      + "close"
       & Description "Closes a task. Fails if there are remaining priorities within the task."
-      & TaskProgram
+      & TaskProgram "close"
      + "tasks"
       & Description "Lists current tasks."
       & Raw
@@ -45,10 +46,10 @@ type TaskManager
      + Raw
     )
 
-type TaskProgram = Arg "task-name" String & Raw
+type TaskProgram x = Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = named @"task-manager" . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
+taskManager = named @"task-manager" . annotated . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
       sub @"help" (description $ usage @TaskManager)
   <+> sub @"edit" (description $ editTask tasksFilePath) 
   <+> sub @"open" (description $ newTask tasksFilePath)
@@ -57,10 +58,10 @@ taskManager = named @"task-manager" . envOptDef @"TASK_DIRECTORY" "tasks" $ \tas
   <+> sub @"priorities" (description $ listPriorities tasksFilePath)
   <+> usage @TaskManager
 
-editTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
+editTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw 
   $ withTask tasksFilePath taskName $ \Context{home} task -> callProcess "vim" [home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"]
 
-newTask tasksFilePath = arg @"task-name" $ \taskName -> raw $ do
+newTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw $ do
   Context{home, tasks} <- initializeOrFetch tasksFilePath
   if not (taskName `elem` tasks)
     then do
@@ -70,7 +71,7 @@ newTask tasksFilePath = arg @"task-name" $ \taskName -> raw $ do
       callProcess "vim" [path]
     else putStrLn $ "task " ++ taskName ++ " already exists."
 
-closeTask tasksFilePath = arg @"task-name" $ \taskName -> raw 
+closeTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw 
   $ withTask tasksFilePath taskName $ \Context{home, tasks} mtask ->
     case mtask of
       Just Task{priorities} ->
