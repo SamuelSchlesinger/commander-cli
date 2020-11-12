@@ -53,6 +53,7 @@ library
 
 executable task-manager
   main-is:             Main.hs
+  other-modules:       Task, Task.IO, Task.CLI, Task.Codec
   other-extensions:    TypeFamilies,
                        ViewPatterns,
                        ScopedTypeVariables,
