@@ -20,7 +20,8 @@ source-repository head
   location: https://github.com/samuelschlesinger/commander-cli
 
 library
-  exposed-modules:     Options.Commander
+  exposed-modules:     Options.Commander,
+                       Options.Commander.Internal
   default-extensions:  AllowAmbiguousTypes,
                        BlockArguments,
                        DataKinds,

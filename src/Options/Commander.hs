@@ -124,20 +124,20 @@ import Data.Functor (($>))
 import Data.HashMap.Strict as HashMap
 import Data.HashSet as HashSet
 import Data.Int
-import Data.Proxy (Proxy(..))
 import Data.Text (Text, pack, unpack, stripPrefix, find)
 import Data.Text.Read (decimal, signed)
 import Data.Word
-import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+import GHC.TypeLits (Symbol, KnownSymbol)
 import GHC.Generics (Generic)
 import Numeric.Natural
 import System.Environment (getArgs, lookupEnv)
-import Data.Typeable (Typeable, typeRep)
+import Data.Typeable (Typeable)
 import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Commander
 import Data.Tree
+import Options.Commander.Internal (showSymbol, showTypeRep)
 
 -- | A class for interpreting command line arguments into Haskell types.
 class Typeable t => Unrender t where
@@ -281,7 +281,7 @@ class HasProgram p where
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Required name t & p) where
   newtype ProgramT (Env 'Required name t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
   run f = Action $ \state -> do
-    val <- lookupEnv (symbolVal (Proxy @name))
+    val <- lookupEnv $ showSymbol @name
     case val of
       Just v ->
         case unrender (pack v) of
@@ -290,8 +290,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Requir
       Nothing -> return (Defeat, state)
   hoist n (EnvProgramT'Required f) = EnvProgramT'Required (hoist n . f)
   documentation = [Node
-    ("required env: " <> symbolVal (Proxy @name)
-    <> " :: " <> show (typeRep (Proxy @t)))
+    ("required env: " <> showSymbol @name <> " :: " <> showTypeRep @t)
     (documentation @p)]
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Optional name t & p) where
@@ -299,7 +298,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
     { unEnvProgramT'Optional :: Maybe t -> ProgramT p m a
     , unEnvDefault :: Maybe t }
   run f = Action $ \state -> do
-    val <- lookupEnv (symbolVal (Proxy @name))
+    val <- lookupEnv $ showSymbol @name
     case val of
       Just v -> do
         case unrender @t (pack v) of
@@ -309,8 +308,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
 
   hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
   documentation = [Node
-    ("optional env: " <> symbolVal (Proxy @name)
-    <> " :: " <> show (typeRep (Proxy @t)))
+    ("optional env: " <> showSymbol @name <> " :: " <> showTypeRep @t)
     (documentation @p)]
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
@@ -324,8 +322,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
       [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
   documentation = [Node
-    ("argument: " <> symbolVal (Proxy @name)
-    <> " :: " <> show (typeRep (Proxy @t)))
+    ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t)
     (documentation @p)]
 
 instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
@@ -347,7 +344,7 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
     { unOptProgramT :: Maybe t -> ProgramT p m a
     , unOptDefault :: Maybe t }
   run f = Action $ \State{..} -> do
-    case HashMap.lookup (pack $ symbolVal (Proxy @option)) options of
+    case HashMap.lookup (showSymbol @option) options of
       Just opt' -> 
         case unrender opt' of
           Just t -> return (run (unOptProgramT f (Just t)), State{..})
@@ -355,20 +352,17 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
       Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   documentation = [Node
-    ("option: -" <> symbolVal (Proxy @option)
-    <> " <" <> symbolVal (Proxy @name)
-    <> " :: " <> show (typeRep (Proxy @t))
-    <> ">")
+    ("option: -" <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
     (documentation @p)]
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
   run f = Action $ \State{..} -> do
-    let presence = HashSet.member (pack (symbolVal (Proxy @flag))) flags
+    let presence = HashSet.member (showSymbol @flag) flags
     return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
   documentation = [Node
-    ("flag: ~" <> symbolVal (Proxy @flag))
+    ("flag: ~" <> showSymbol @flag)
     (documentation @p)]
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
@@ -376,7 +370,7 @@ instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
   run = run . unNamedProgramT 
   hoist n = NamedProgramT . hoist n . unNamedProgramT
   documentation = [Node
-    ("name: " <> symbolVal (Proxy @name))
+    ("name: " <> showSymbol @name)
     (documentation @p)]
 
 instance (KnownSymbol description, HasProgram p) => HasProgram (Description description & p) where
@@ -384,27 +378,27 @@ instance (KnownSymbol description, HasProgram p) => HasProgram (Description desc
   run = run . unDescriptionProgramT 
   hoist n = DescriptionProgramT . hoist n . unDescriptionProgramT
   documentation = [Node
-    ("description: " <> symbolVal (Proxy @description))
+    ("description: " <> showSymbol @description)
     []] <> documentation @p
 
 instance (KnownSymbol annotation, HasProgram (combinator & p)) => HasProgram (Annotated annotation combinator & p) where
   newtype ProgramT (Annotated annotation combinator & p) m a = AnnotatedProgramT { unAnnotatedProgramT :: ProgramT (combinator & p) m a }
   run = run . unAnnotatedProgramT 
   hoist n = AnnotatedProgramT . hoist n . unAnnotatedProgramT
-  documentation = fmap (\(Node x s) -> Node (x <> ", " <> symbolVal (Proxy @annotation)) s) (documentation @(combinator & p))
+  documentation = fmap (\(Node x s) -> Node (x <> ", " <> showSymbol @annotation) s) (documentation @(combinator & p))
 
 instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
   newtype ProgramT (sub & p) m a = SubProgramT { unSubProgramT :: ProgramT p m a }
   run s = Action $ \State{..} -> do 
     case arguments of
       (x : xs) -> 
-        if x == pack (symbolVal $ Proxy @sub) 
+        if x == showSymbol @sub
           then return (run $ unSubProgramT s, State{arguments = xs, ..})
           else return (Defeat, State{..})
       [] -> return (Defeat, State{..})
   hoist n = SubProgramT . hoist n . unSubProgramT
   documentation = [Node
-    ("subprogram: " <> symbolVal (Proxy @sub))
+    ("subprogram: " <> showSymbol @sub)
     (documentation @p)]
 
 -- | A simple default for getting out the arguments, options, and flags
@@ -426,7 +420,8 @@ initialState = do
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags that I get using the 'initialState' function,
 -- ignoring the output of the program.
-command_ :: HasProgram p 
+command_ :: forall p a.
+            HasProgram p 
          => ProgramT p IO a 
          -> IO ()
 command_ prog = void $ initialState >>= runCommanderT (run prog)
@@ -435,25 +430,29 @@ command_ prog = void $ initialState >>= runCommanderT (run prog)
 -- arguments, and flags that I get using the 'initialState' function,
 -- returning 'Just' the output of the program upon successful option and argument
 -- parsing and returning 'Nothing' otherwise.
-command :: HasProgram p 
+command :: forall p a.
+           HasProgram p 
         => ProgramT p IO a 
         -> IO (Maybe a)
 command prog = initialState >>= runCommanderT (run prog)
 
 -- | Required environment variable combinator
-env :: KnownSymbol name
+env :: forall name p x m a.
+     KnownSymbol name
   => (x -> ProgramT p m a)
   -> ProgramT (Env 'Required name x & p) m a
 env = EnvProgramT'Required
 
 -- | Optional environment variable combinator
-envOpt :: KnownSymbol name
+envOpt :: forall name x p m a.
+     KnownSymbol name
   => (Maybe x -> ProgramT p m a)
   -> ProgramT (Env 'Optional name x & p) m a
 envOpt = flip EnvProgramT'Optional Nothing
 
 -- | Optional environment variable combinator with default
-envOptDef :: KnownSymbol name
+envOptDef :: forall name x p m a.
+     KnownSymbol name
   => x
   -> (x -> ProgramT p m a)
   -> ProgramT (Env 'Optional name x & p) m a
@@ -462,31 +461,36 @@ envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Opti
 -- | Environment 
 
 -- | Argument combinator
-arg :: KnownSymbol name
+arg :: forall name x p m a.
+       KnownSymbol name
     => (x -> ProgramT p m a) 
     -> ProgramT (Arg name x & p) m a 
 arg = ArgProgramT
 
 -- | Option combinator
-opt :: (KnownSymbol option, KnownSymbol name)
+opt :: forall option name x p m a.
+       (KnownSymbol option, KnownSymbol name)
     => (Maybe x -> ProgramT p m a) 
     -> ProgramT (Opt option name x & p) m a
 opt = flip OptProgramT Nothing
 
 -- | Option combinator with default
-optDef :: (KnownSymbol option, KnownSymbol name)
+optDef :: forall option name x p m a.
+     (KnownSymbol option, KnownSymbol name)
   => x
   -> (x -> ProgramT p m a)
   -> ProgramT (Opt option name x & p) m a
 optDef x f = OptProgramT { unOptDefault = Just x, unOptProgramT = \case { Just x -> f x; Nothing -> error "Violated invariant of optDef" } }
 
 -- | Raw monadic combinator
-raw :: m a 
+raw :: forall m a.
+       m a 
     -> ProgramT Raw m a
 raw = RawProgramT
 
 -- | Subcommand combinator
-sub :: KnownSymbol s 
+sub :: forall s p m a.
+       KnownSymbol s 
     => ProgramT p m a 
     -> ProgramT (s & p) m a
 sub = SubProgramT
@@ -494,13 +498,15 @@ sub = SubProgramT
 -- | Named command combinator, useful at the top level for naming
 -- a program. Typically, the name will be the name or alias of the
 -- executable you expect to produce.
-named :: KnownSymbol s 
+named :: forall s p m a.
+         KnownSymbol s 
       => ProgramT p m a 
       -> ProgramT (Named s & p) m a
 named = NamedProgramT
 
 -- | Boolean flag combinator
-flag :: KnownSymbol f 
+flag :: forall f p m a.
+        KnownSymbol f 
      => (Bool -> ProgramT p m a) 
      -> ProgramT (Flag f & p) m a
 flag = FlagProgramT
