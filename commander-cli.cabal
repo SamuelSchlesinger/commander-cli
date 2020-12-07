@@ -21,26 +21,25 @@ source-repository head
 
 library
   exposed-modules:     Options.Commander
-  default-extensions:  ViewPatterns,
-                       DerivingVia,
-                       StandaloneDeriving,
-                       GeneralizedNewtypeDeriving,
-                       DerivingStrategies,
-                       OverloadedStrings,
-                       FlexibleInstances,
-                       TypeFamilies,
-                       TypeSynonymInstances,
-                       ScopedTypeVariables,
-                       RecordWildCards,
-                       TypeApplications,
-                       RankNTypes,
-                       DeriveFunctor,
-                       AllowAmbiguousTypes,
-                       PolyKinds,
-                       GADTs,
-                       TypeOperators,
+  default-extensions:  AllowAmbiguousTypes,
+                       BlockArguments,
                        DataKinds,
-                       DeriveGeneric
+                       DeriveGeneric,
+                       DerivingVia,
+                       FlexibleInstances,
+                       GADTs,
+                       GeneralizedNewtypeDeriving,
+                       LambdaCase,
+                       OverloadedStrings,
+                       PolyKinds,
+                       RankNTypes,
+                       RecordWildCards,
+                       ScopedTypeVariables,
+                       StandaloneDeriving,
+                       TypeApplications,
+                       TypeFamilies,
+                       TypeOperators,
+                       UndecidableInstances
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
@@ -53,15 +52,17 @@ library
 
 executable task-manager
   main-is:             Main.hs
-  default-extensions:  TypeFamilies,
-                       ViewPatterns,
-                       ScopedTypeVariables,
-                       NamedFieldPuns,
-                       RecordWildCards,
-                       LambdaCase,
+  default-extensions:  BlockArguments,
                        DataKinds,
+                       LambdaCase,
+                       NamedFieldPuns,
+                       PolyKinds,
+                       RecordWildCards,
+                       ScopedTypeVariables,
                        TypeApplications,
-                       TypeOperators
+                       TypeFamilies,
+                       TypeOperators,
+                       ViewPatterns
   build-depends:       base >=4.12 && < 5,
                        mtl >=2.2 && <3,
                        text >=1.2 && < 2,
@@ -75,6 +76,12 @@ executable task-manager
 test-suite test-commander
   type:                exitcode-stdio-1.0
   main-is:             Test.hs
+  default-extensions:  BlockArguments,
+                       DataKinds,
+                       LambdaCase,
+                       OverloadedStrings,
+                       TypeApplications,
+                       TypeOperators
   build-depends:       base >= 4.12 && < 5,
                        text >=1.2 && < 2,
                        unordered-containers >= 0.2 && < 1,
