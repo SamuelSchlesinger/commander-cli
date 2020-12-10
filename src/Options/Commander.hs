@@ -445,7 +445,8 @@ initialState = do
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags that I get using the 'initialState' function,
 -- ignoring the output of the program.
-command_ :: HasProgram p 
+command_ :: forall p a.
+            HasProgram p 
          => ProgramT p IO a 
          -> IO ()
 command_ prog = void $ initialState >>= runCommanderT (run prog)
@@ -454,25 +455,29 @@ command_ prog = void $ initialState >>= runCommanderT (run prog)
 -- arguments, and flags that I get using the 'initialState' function,
 -- returning 'Just' the output of the program upon successful option and argument
 -- parsing and returning 'Nothing' otherwise.
-command :: HasProgram p 
+command :: forall p a.
+           HasProgram p 
         => ProgramT p IO a 
         -> IO (Maybe a)
 command prog = initialState >>= runCommanderT (run prog)
 
 -- | Required environment variable combinator
-env :: KnownSymbol name
+env :: forall name p x m a.
+     KnownSymbol name
   => (x -> ProgramT p m a)
   -> ProgramT (Env 'Required name x & p) m a
 env = EnvProgramT'Required
 
 -- | Optional environment variable combinator
-envOpt :: KnownSymbol name
+envOpt :: forall name x p m a.
+     KnownSymbol name
   => (Maybe x -> ProgramT p m a)
   -> ProgramT (Env 'Optional name x & p) m a
 envOpt = flip EnvProgramT'Optional Nothing
 
 -- | Optional environment variable combinator with default
-envOptDef :: KnownSymbol name
+envOptDef :: forall name x p m a.
+     KnownSymbol name
   => x
   -> (x -> ProgramT p m a)
   -> ProgramT (Env 'Optional name x & p) m a
@@ -481,31 +486,36 @@ envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Opti
 -- | Environment 
 
 -- | Argument combinator
-arg :: KnownSymbol name
+arg :: forall name x p m a.
+       KnownSymbol name
     => (x -> ProgramT p m a) 
     -> ProgramT (Arg name x & p) m a 
 arg = ArgProgramT
 
 -- | Option combinator
-opt :: (KnownSymbol option, KnownSymbol name)
+opt :: forall option name x p m a.
+       (KnownSymbol option, KnownSymbol name)
     => (Maybe x -> ProgramT p m a) 
     -> ProgramT (Opt option name x & p) m a
 opt = flip OptProgramT Nothing
 
 -- | Option combinator with default
-optDef :: (KnownSymbol option, KnownSymbol name)
+optDef :: forall option name x p m a.
+     (KnownSymbol option, KnownSymbol name)
   => x
   -> (x -> ProgramT p m a)
   -> ProgramT (Opt option name x & p) m a
 optDef x f = OptProgramT { unOptDefault = Just x, unOptProgramT = \case { Just x -> f x; Nothing -> error "Violated invariant of optDef" } }
 
 -- | Raw monadic combinator
-raw :: m a 
+raw :: forall m a.
+       m a 
     -> ProgramT Raw m a
 raw = RawProgramT
 
 -- | Subcommand combinator
-sub :: KnownSymbol s 
+sub :: forall s p m a.
+       KnownSymbol s 
     => ProgramT p m a 
     -> ProgramT (s & p) m a
 sub = SubProgramT
@@ -513,13 +523,15 @@ sub = SubProgramT
 -- | Named command combinator, useful at the top level for naming
 -- a program. Typically, the name will be the name or alias of the
 -- executable you expect to produce.
-named :: KnownSymbol s 
+named :: forall s p m a.
+         KnownSymbol s 
       => ProgramT p m a 
       -> ProgramT (Named s & p) m a
 named = NamedProgramT
 
 -- | Boolean flag combinator
-flag :: KnownSymbol f 
+flag :: forall f p m a.
+        KnownSymbol f 
      => (Bool -> ProgramT p m a) 
      -> ProgramT (Flag f & p) m a
 flag = FlagProgramT
