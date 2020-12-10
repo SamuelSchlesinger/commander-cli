@@ -105,7 +105,7 @@ module Options.Commander (
     The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.
     It has the ability to backtrack and it maintains some state.
   -}
-  CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
+  CommanderT(Action, Defeat, Victory), runCommanderT,
   -- ** Middleware for CommanderT
   {- |
     If you want to modify your interpreted CLI program, in its 'CommanderT'
@@ -255,11 +255,11 @@ infixr 2 +
 -- this library. It is not inlined, because that does nothing but obfuscate
 -- the 'CommanderT' monad. It consists of 'arguments', 'options', and
 -- 'flags'.
-data State = State 
-  { arguments :: [Text]
-  , options :: HashMap Text Text
-  , flags :: HashSet Text
-  } deriving (Generic, Show, Eq, Ord)
+-- data State = State 
+--   { arguments :: [Text]
+--   , options :: HashMap Text Text
+--   , flags :: HashSet Text
+--   } deriving (Generic, Show, Eq, Ord)
 
 -- | This is the workhorse of the library. Basically, it allows you to 
 -- 'run' your 'ProgramT'
@@ -274,7 +274,7 @@ data State = State
 -- 'usage' programs.
 class HasProgram p where
   data ProgramT p (m :: * -> *) a
-  run :: ProgramT p IO a -> CommanderT State IO a
+  run :: ProgramT p IO a -> CommanderT [Text] IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
   documentation :: Forest String
 
@@ -313,13 +313,16 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Option
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
   newtype ProgramT (Arg name t & p) m a = ArgProgramT { unArgProgramT :: t -> ProgramT p m a }
-  run f = Action $ \State{..} -> do
-    case arguments of
-      (x : xs) -> 
-        case unrender x of
-          Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
-          Nothing -> return (Defeat, State{..})
-      [] -> return (Defeat, State{..})
+  run f = Action $ return . \case
+    (unrender -> Just x):xs -> (run $ unArgProgramT f x, xs)
+    xs -> (Defeat,xs)
+  -- run f = Action $ \State{..} -> do
+  --   case arguments of
+  --     (x : xs) -> 
+  --       case unrender x of
+  --         Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
+  --         Nothing -> return (Defeat, State{..})
+  --     [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
   documentation = [Node
     ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t)
@@ -343,26 +346,41 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
   data ProgramT (Opt option name t & p) m a = OptProgramT
     { unOptProgramT :: Maybe t -> ProgramT p m a
     , unOptDefault :: Maybe t }
-  run f = Action $ \State{..} -> do
-    case HashMap.lookup (showSymbol @option) options of
-      Just opt' -> 
-        case unrender opt' of
-          Just t -> return (run (unOptProgramT f (Just t)), State{..})
-          Nothing -> return (Defeat, State{..})
-      Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
+  run f = Action $ return . recurseOpt
+    where
+    recurseOpt = \case
+      d@(x:y:xs) | x == showSymbol @option -> maybe (Defeat,d) (\t -> (run $ unOptProgramT f $ Just t, xs)) $ unrender y
+      x:xs -> (x :) <$> recurseOpt xs
+      [] -> (run $ unOptProgramT f $ unOptDefault f, [])
+  -- run f = Action $ \State{..} -> do
+  --   case HashMap.lookup (showSymbol @option) options of
+  --     Just opt' -> 
+  --       case unrender opt' of
+  --         Just t -> return (run (unOptProgramT f (Just t)), State{..})
+  --         Nothing -> return (Defeat, State{..})
+  --     Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   documentation = [Node
-    ("option: -" <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
+    ("option: " <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
+    -- ("option: -" <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
     (documentation @p)]
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
-  run f = Action $ \State{..} -> do
-    let presence = HashSet.member (showSymbol @flag) flags
-    return (run (unFlagProgramT f presence), State{..})
+  run f = Action $ return . first (run . unFlagProgramT f) . recurseFlag
+    where
+    recurseFlag :: [Text] -> (Bool,[Text])
+    recurseFlag = \case
+      x:xs | x == showSymbol @flag -> (True,xs)
+           | otherwise -> (x :) <$> recurseFlag xs
+      [] -> (False,[])
+  -- run f = Action $ \State{..} -> do
+  --   let presence = HashSet.member (showSymbol @flag) flags
+  --   return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
   documentation = [Node
-    ("flag: ~" <> showSymbol @flag)
+    ("flag: " <> showSymbol @flag)
+    -- ("flag: ~" <> showSymbol @flag)
     (documentation @p)]
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
@@ -389,33 +407,29 @@ instance (KnownSymbol annotation, HasProgram (combinator & p)) => HasProgram (An
 
 instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
   newtype ProgramT (sub & p) m a = SubProgramT { unSubProgramT :: ProgramT p m a }
-  run s = Action $ \State{..} -> do 
-    case arguments of
-      (x : xs) -> 
-        if x == showSymbol @sub
-          then return (run $ unSubProgramT s, State{arguments = xs, ..})
-          else return (Defeat, State{..})
-      [] -> return (Defeat, State{..})
+  run s = Action $ return . \case
+    x:xs | x == showSymbol @sub -> (run $ unSubProgramT s, xs)
+    x -> (Defeat, x)
   hoist n = SubProgramT . hoist n . unSubProgramT
   documentation = [Node
     ("subprogram: " <> showSymbol @sub)
     (documentation @p)]
 
--- | A simple default for getting out the arguments, options, and flags
--- using 'getArgs'. We use the syntax ~flag for flags and -opt
--- for options, with arguments using the typical ordered representation.
-initialState :: IO State
-initialState = do
-  args <- getArgs
-  let (opts, args', flags) = takeOptions args
-  return $ State args' (HashMap.fromList opts) (HashSet.fromList flags) 
-    where
-      takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
-      takeOptions = go [] [] [] where
-        go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
-        go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
-        go opts args flags (x : y) = go opts (pack x : args) flags y
-        go opts args flags [] = (opts, reverse args, flags)
+-- -- | A simple default for getting out the arguments, options, and flags
+-- -- using 'getArgs'. We use the syntax ~flag for flags and -opt
+-- -- for options, with arguments using the typical ordered representation.
+-- initialState :: IO State
+-- initialState = do
+--   args <- getArgs
+--   let (opts, args', flags) = takeOptions args
+--   return $ State args' (HashMap.fromList opts) (HashSet.fromList flags) 
+--     where
+--       takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
+--       takeOptions = go [] [] [] where
+--         go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
+--         go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
+--         go opts args flags (x : y) = go opts (pack x : args) flags y
+--         go opts args flags [] = (opts, reverse args, flags)
 
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags that I get using the 'initialState' function,
@@ -424,7 +438,8 @@ command_ :: forall p a.
             HasProgram p 
          => ProgramT p IO a 
          -> IO ()
-command_ prog = void $ initialState >>= runCommanderT (run prog)
+-- command_ prog = void $ initialState >>= runCommanderT (run prog)
+command_ = void . command
 
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags that I get using the 'initialState' function,
@@ -434,7 +449,10 @@ command :: forall p a.
            HasProgram p 
         => ProgramT p IO a 
         -> IO (Maybe a)
-command prog = initialState >>= runCommanderT (run prog)
+-- command prog = initialState >>= runCommanderT (run prog)
+command prog = runCommanderT (run prog) . fmap pack =<< getArgs
+
+-- | Environment 
 
 -- | Required environment variable combinator
 env :: forall name p x m a.
@@ -457,8 +475,6 @@ envOptDef :: forall name x p m a.
   -> (x -> ProgramT p m a)
   -> ProgramT (Env 'Optional name x & p) m a
 envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Optional = \case { Just x -> f x; Nothing -> error "Violated invariant of optEnvDef" } }
-
--- | Environment 
 
 -- | Argument combinator
 arg :: forall name x p m a.
@@ -546,7 +562,7 @@ description = DescriptionProgramT
 -- | The type of middleware, which can transform interpreted command line programs
 -- by meddling with arguments, options, or flags, or by adding effects for
 -- every step. You can also change the underlying monad.
-type Middleware m n = forall a. CommanderT State m a -> CommanderT State n a
+type Middleware m n = forall a. CommanderT [Text] m a -> CommanderT [Text] n a
 
 -- | Middleware to transform the base monad with a natural transformation.
 transform :: (Monad m, Monad n) => (forall a. m a -> n a) -> Middleware m n
@@ -580,7 +596,6 @@ withVictoryEffects ma commander = case commander of
     pure (withVictoryEffects ma commander', state')
   Defeat -> Defeat
   Victory a -> Action $ \state -> ma $> (Victory a, state)
-
 
 -- | Produce a 2-dimensional textual drawing of the 'Tree' description of
 -- this program.

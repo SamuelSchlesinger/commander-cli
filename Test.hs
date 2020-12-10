@@ -11,135 +11,99 @@ import System.Exit
 import Control.Exception
 import System.Environment (setEnv)
 import Data.Maybe
+import Test.Hspec hiding (Arg)
+
 
 main :: IO ()
-main =
-     rawTest
-  >> argTest
-  >> optTest
-  >> flagTest
-  >> bigProgTests
-  >> optDefTest
-  >> envTest
-  >> envOptTest
-  >> envOptDefTest
-  >> eitherSwitchTest
-rawProg :: ProgramT Raw IO Bool
-rawProg = raw (pure True)
+main = hspec do
+  it "raw" do
+    let rawProg :: ProgramT Raw IO Bool
+        rawProg = raw (pure True)
+    x <- runCommanderT (run rawProg) []
+    x `shouldBe` Just True
 
-testMaybeBool :: Maybe Bool -> IO ()
-testMaybeBool = maybe exitFailure (cond (pure ()) exitFailure)
+  it "arg" do
+    let argProg :: (String -> Bool) -> ProgramT (Arg "arg" String & Raw) IO Bool
+        argProg prop = arg \a -> raw (pure (prop a))
+    x <- runCommanderT (run (argProg (== "hello"))) ["hello"]
+    x `shouldBe` Just True
 
-testBool :: Bool -> IO ()
-testBool = cond (pure ()) exitFailure
+  it "opt" do
+    let optProg :: (Maybe String -> Bool) -> ProgramT (Opt "opt" "opt" String & Raw) IO Bool
+        optProg prop = opt \o -> raw (pure (prop o))
+    x <- runCommanderT (run (optProg (== Just "hello"))) ["opt", "hello"]
+    x `shouldBe` Just True
+    
+  it "flag" do
+    let flagProg :: Monad m => ProgramT (Flag "flag" & Raw) m Bool
+        flagProg = flag (raw . pure)
+    x <- runCommanderT (run flagProg) ["flag"]
+    x `shouldBe` Just True
 
-rawTest :: IO ()
-rawTest = maybe exitFailure (cond (pure ()) exitFailure) =<< runCommanderT (run rawProg) (State mempty mempty mempty)
+  describe "bigProgTests" do
+    let bigProg :: Monad m => ProgramT ("argument" & Arg "arg" String & Flag "flag" & Raw + Opt "opt" "option-test" Word64 & "option" & Raw) m (Either (String,Bool) (Maybe Word64))
+        bigProg = (sub @"argument" $ arg $ \a -> flag $ \f -> raw $ pure $ Left (a,f)) <+>
+                  (opt \o -> sub @"option" $ raw $ pure $ Right o)
+    let test prog result state = it (show state) $ runCommanderT (run prog) state >>= (`shouldBe` result)
+    test bigProg (Just $ Left ("arg",True)) ["argument", "arg", "flag"]
+    test bigProg (Just $ Right $ Just 0)    ["option", "opt", "0"]
+    test bigProg Nothing                    ["argument"]
+    test bigProg Nothing                    ["argument", "opt", "option"]
+    test bigProg Nothing                    ["argument", "opt", "option", "flag"]
+    test bigProg (Just $ Right $ Just 0)    ["option", "opt'", "option"]
+    test bigProg (Just $ Right $ Just 1)    ["option", "opt", "1", "flag"]
 
-argProg :: (String -> Bool) -> ProgramT (Arg "arg" String & Raw) IO Bool
-argProg prop = arg \a -> raw (pure (prop a))
+  describe "optDef" do
+    let optDefProg :: ProgramT (Opt "o" "opt" String & Raw) IO String
+        optDefProg = optDef "Default" \o -> raw $ pure o
+    let test testName result state = it testName do
+          x <- runCommanderT (run optDefProg) state
+          x `shouldBe` Just result
+    test "default option" "Default" []
+    test "option provided" "hello" ["o", "hello"]
 
-cond :: x -> x -> Bool -> x
-cond x y True = x
-cond x y False = y
+  it "env" do
+    let envProg :: forall a. Unrender a => ProgramT (Env 'Required "ONOGOTTAFINDABIGNAME" a & Raw) IO a
+        envProg = env \e -> raw $ pure e
+    let test :: forall a. (Unrender a, Show a, Eq a) => Maybe a -> IO ()
+        test result = runCommanderT (run envProg) [] >>= (`shouldBe` result)
+    test @String Nothing
+    setEnv "ONOGOTTAFINDABIGNAME" "POOP"
+    test @String $ Just "POOP"
+    setEnv "ONOGOTTAFINDABIGNAME" "6"
+    test @Int $ Just 6
 
-argTest :: IO ()
-argTest = maybe exitFailure (cond (pure ()) exitFailure) =<< runCommanderT (run (argProg (== "hello"))) (State ["hello"] mempty mempty)
+  it "envOpt" do
+    let envOptProg :: forall a. ProgramT (Env 'Optional "BIGNAME" a & Raw) IO (Maybe a)
+        envOptProg = envOpt \e -> raw $ pure e
+    let test :: forall a. (Unrender a, Show a, Eq a) => Maybe (Maybe a) -> IO ()
+        test result  = runCommanderT (run $ envOptProg @a) [] >>= (`shouldBe` result)
+    test @String $ Just Nothing
+    setEnv "BIGNAME" "POP"
+    test @String $ Just $ Just "POP"
+    setEnv "BIGNAME" "3"
+    test @Int $ Just $ Just 3
 
-optProg :: (Maybe String -> Bool) -> ProgramT (Opt "opt" "opt" String & Raw) IO Bool
-optProg prop = opt \o -> raw (pure (prop o))
+  it "envOptDef" do
+    let envOptDefProg :: a -> ProgramT (Env 'Optional "CORPUS" a & Raw) IO a
+        envOptDefProg x = envOptDef x \e -> raw $ pure e
+    let test :: (Unrender a, Show a, Eq a) => a -> Maybe a -> IO ()
+        test defaultVal result = runCommanderT (run $ envOptDefProg defaultVal) [] >>= (`shouldBe` result)
+    test @Int 1 $ Just 1
+    setEnv "CORPUS" "2"
+    test @Int 1 $ Just 2
+    setEnv "CORPUS" "POOP"
+    test @String "POOP" $ Just "POOP"
 
-optTest :: IO ()
-optTest = maybe exitFailure (cond (pure ()) exitFailure) =<< runCommanderT (run (optProg (== Just "hello"))) (State mempty (HashMap.fromList [("opt", "hello")]) mempty)
-
-flagProg :: Monad m => ProgramT (Flag "flag" & Raw) m Bool
-flagProg = flag (raw . pure)
-
-flagTest :: IO ()
-flagTest = maybe exitFailure (cond (pure ()) exitFailure) =<< runCommanderT (run flagProg) (State mempty mempty (HashSet.fromList ["flag"]))
-
-test :: HasProgram p => ProgramT p IO Bool -> State -> IO (Maybe Bool)
-test prog state = runCommanderT (logState $ run prog) state
-
-bigProg :: Monad m => ProgramT ("argument" & Arg "arg" String & Flag "flag" & Raw + Opt "opt" "option-test" Word64 & "option" & Raw) m Bool
-bigProg = (sub @"argument" $ arg $ \a -> flag $ \f -> raw $ pure $ f && a == "arg") <+> (opt \o -> sub @"option" $ raw $ pure (o == Just 0))
-
-bigProgTests :: IO ()
-bigProgTests = do
-  testMaybeBool =<< test bigProg (State ["argument", "arg"] mempty (HashSet.singleton "flag"))
-  testMaybeBool =<< test bigProg (State ["option"] (HashMap.fromList [("opt", "0")]) mempty)
-  testBool =<< isNothing <$> test bigProg (State ["argument"] mempty mempty)
-  testBool =<< isNothing <$> test bigProg (State ["argument"] (HashMap.fromList [("opt", "option")]) mempty)
-  testBool =<< isNothing <$> test bigProg (State ["argument"] (HashMap.fromList [("opt", "option")]) (HashSet.singleton "flag"))
-  testBool =<< (== Just False) <$> test bigProg (State ["option"] (HashMap.fromList [("opt'", "option")]) mempty)
-  testBool =<< (== Just False) <$> test bigProg (State ["option"] (HashMap.fromList [("opt", "1")]) (HashSet.singleton "flag"))
-
-optDefProg :: (String -> Bool) -> ProgramT (Opt "o" "opt" String & Raw) IO Bool
-optDefProg prop = optDef "Default" \o -> raw (pure (prop o))
-
-optDefTest :: IO ()
-optDefTest = 
-     parlay (pure ()) exitFailure (== "Default") (State mempty mempty mempty)
-  >> parlay (pure ()) exitFailure (== "hello") (State mempty (HashMap.fromList [("o", "hello")]) mempty)
-  >> parlay exitFailure (pure ()) (== "Default0") (State mempty mempty mempty)
-  >> parlay exitFailure (pure ()) (== "hello0") (State mempty (HashMap.fromList [("o", "hello")]) mempty)
-  where
-  parlay y n prop state = maybe exitFailure (cond y n) =<< runCommanderT (run (optDefProg prop)) state
-
-envProg :: (x -> Bool) -> ProgramT (Env 'Required "ONOGOTTAFINDABIGNAME" x & Raw) IO Bool
-envProg prop = env \e -> raw (pure (prop e))
-
-envTest :: IO ()
-envTest = do
-  putStrLn "Testing environment variables"
-  testBool =<< isNothing <$> test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
-  setEnv "ONOGOTTAFINDABIGNAME" "POOP"
-  testMaybeBool =<< test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
-  setEnv "ONOGOTTAFINDABIGNAME" "POP"
-  testMaybeBool =<< fmap not <$> test (envProg (== ("POOP" :: String))) (State mempty mempty mempty)
-
-envOptProg :: (Maybe x -> Bool) -> ProgramT (Env 'Optional "BIGNAME" x & Raw) IO Bool
-envOptProg prop = envOpt \e -> raw (pure (prop e))
-
-envOptProg' :: ProgramT (Env 'Optional "BIGNAME" x & Raw) IO (Maybe x)
-envOptProg' = envOpt \e -> raw (pure e)
-
-envOptTest :: IO ()
-envOptTest = do
-  putStrLn "Testing optional environment variables"
-  testMaybeBool =<< test (envOptProg (== (Nothing @Bool))) (State mempty mempty mempty)
-  setEnv "BIGNAME" "POP"
-  testMaybeBool =<< fmap not <$> test (envOptProg (== (Just ("POOP" :: String)))) (State mempty mempty mempty)
-  testMaybeBool =<< test (envOptProg (== (Just ("POP" :: String)))) (State mempty mempty mempty)
-
-envOptDefProg :: x -> (x -> Bool) -> ProgramT (Env 'Optional "CORPUS" x & Raw) IO Bool
-envOptDefProg x prop = envOptDef x \e -> raw (pure (prop e))
-
-envOptDefTest :: IO ()
-envOptDefTest = do
-  putStrLn "Testing optional environment variables with hard-coded defaults"
-  testMaybeBool =<< test (envOptDefProg (10 :: Int) (== 10)) (State mempty mempty mempty)
-  testMaybeBool =<< fmap not <$> test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
-  setEnv "CORPUS" "POOP"
-  testMaybeBool =<< test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
-
-eitherSwitchProg :: (x -> Bool) -> (y -> Bool) -> ProgramT (Arg "xy" (Either x y) & Raw) IO (Either Bool Bool)
-eitherSwitchProg xpred ypred = arg \case { Left x -> raw (pure (Left $ xpred x)); Right y -> raw (pure (Right $ ypred y)) }
-
-eitherSwitchTest  :: IO ()
-eitherSwitchTest = do
-  let example = eitherSwitchProg (== (10 :: Int)) (== ("Hello" :: String))
-  let ploof a c = runCommanderT (run example) (State a mempty mempty) >>= c
-  ploof ["10"] \case
-    Just (Left True) -> pure ()
-    _ -> exitFailure
-  ploof ["Hello"] \case
-    Just (Right True) -> pure ()
-    _ -> exitFailure
-  ploof ["Poop"] \case
-    Just (Right False) -> pure ()
-    _ -> exitFailure
-  ploof [] \case
-    Nothing -> pure ()
-    _ -> exitFailure
+  describe "eitherSwitch" do
+    let eitherSwitchProg :: ProgramT (Arg "xy" (Either Int String) & Raw) IO (Either Int String)
+        eitherSwitchProg = arg \case
+          Left x -> raw $ pure $ Left x
+          Right y -> raw $ pure $ Right y
+    let test testName result state = it testName do
+          x <- runCommanderT (run eitherSwitchProg) state
+          x `shouldBe` result
+    test "left" (Just $ Left 10) ["10"]
+    test "right" (Just $ Right "Hello") ["Hello"]
+    test "no arguments" Nothing []
 
