@@ -21,26 +21,6 @@ source-repository head
 
 library
   exposed-modules:     Options.Commander
-  other-extensions:    ViewPatterns,
-                       DerivingVia,
-                       StandaloneDeriving,
-                       GeneralizedNewtypeDeriving,
-                       DerivingStrategies,
-                       OverloadedStrings,
-                       FlexibleInstances,
-                       TypeFamilies,
-                       TypeSynonymInstances,
-                       ScopedTypeVariables,
-                       RecordWildCards,
-                       TypeApplications,
-                       RankNTypes,
-                       DeriveFunctor,
-                       AllowAmbiguousTypes,
-                       PolyKinds,
-                       GADTs,
-                       TypeOperators,
-                       DataKinds,
-                       DeriveGeneric
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
@@ -53,15 +33,6 @@ library
 
 executable task-manager
   main-is:             Main.hs
-  other-extensions:    TypeFamilies,
-                       ViewPatterns,
-                       ScopedTypeVariables,
-                       NamedFieldPuns,
-                       RecordWildCards,
-                       LambdaCase,
-                       DataKinds,
-                       TypeApplications,
-                       TypeOperators
   build-depends:       base >=4.12 && < 5,
                        mtl >=2.2 && <3,
                        text >=1.2 && < 2,
