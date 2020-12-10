@@ -30,41 +30,6 @@ Commander is an embedded domain specific language describing a command line
 interface, along with ways to run those as real programs. An complete example
 of such a command line interface is:
 
-@
-main :: IO ()
-main = command_ . toplevel @"file" $
- (sub @"maybe-read" $
-  arg @"filename" \filename ->
-  flag @"read" \b -> raw $
-    if b
-      then putStrLn =<< readFile filename
-      else pure ())
-  \<+\>
- (sub @"maybe-write" $
-  opt @"file" @"file-to-write" \mfilename -> raw $
-    case mfilename of
-      Just filename -> putStrLn =<< readFile filename
-      Nothing -> pure ())
-@
-
-If I run this program with the argument help, it will output:
-
-@
-usage:
-name: file
-|
-+- subprogram: help
-|
-+- subprogram: maybe-read
-|  |
-|  `- argument: filename :: [Char]
-|     |
-|     `- flag: ~read
-|
-`- subprogram: maybe-write
-   |
-   `- option: -file <file-to-write :: [Char]>
-@
 
 The point of this library is mainly so that you can write command line
 interfaces quickly and easily, with somewhat useful help messages, and 
