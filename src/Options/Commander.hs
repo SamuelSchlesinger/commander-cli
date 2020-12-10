@@ -251,19 +251,9 @@ infixr 4 &
 data a + b
 infixr 2 +
 
--- | This is the 'State' that the 'CommanderT' library uses for its role in
--- this library. It is not inlined, because that does nothing but obfuscate
--- the 'CommanderT' monad. It consists of 'arguments', 'options', and
--- 'flags'.
--- data State = State 
---   { arguments :: [Text]
---   , options :: HashMap Text Text
---   , flags :: HashSet Text
---   } deriving (Generic, Show, Eq, Ord)
-
 -- | This is the workhorse of the library. Basically, it allows you to 
 -- 'run' your 'ProgramT'
--- representation of your program as a 'CommanderT' and pump the 'State'
+-- representation of your program as a 'CommanderT' and pump the '[Text]'
 -- through it until you've processed all of the arguments, options, and
 -- flags that you have specified must be used in your 'ProgramT'. You can
 -- think of 'ProgramT' as a useful syntax for command line programs, but
