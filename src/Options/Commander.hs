@@ -17,6 +17,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveFunctor #-}
 {- |
 Module: Options.Commander
 Description: A set of combinators for constructing and executing command line programs
@@ -78,6 +79,7 @@ module Options.Commander (
     the sake of generating documentation.
   -}
   Unrender(unrender),
+  Alternate(Alternate,Primary), AltEither, altEither,
   -- ** Defining CLI Programs
   {- |
     To construct a 'ProgramT' (a specification of a CLI program), you can
@@ -181,10 +183,20 @@ unrenderSmall = flip Prelude.lookup [(pack $ show x, x) | x <- [minBound..maxBou
 instance Unrender () where
   unrender = unrenderSmall
 
-instance (Unrender a, Unrender b) => Unrender (Either a b) where
-  unrender x = leftCase x <|> rightCase x where
-    leftCase  = fmap Left  . unrender
-    rightCase = fmap Right . unrender
+-- | Allows alternate unrendering.
+data Alternate a b = Alternate a | Primary b deriving (Show, Eq, Ord, Functor)
+
+-- | Compatibility type for the old Unrender Either instance. Use altEither to convert AltEither to Either.
+type AltEither a b = Alternate b a
+
+-- | Compatibility type for the old Unrender Either instance.
+altEither :: forall a b. AltEither a b -> Either a b
+altEither = \case
+  Alternate x -> Right x
+  Primary   x -> Left  x
+
+instance (Unrender a, Unrender b) => Unrender (Alternate a b) where
+  unrender x = (Primary <$> unrender x) <|> (Alternate <$> unrender x)
 
 instance Unrender Bool where
   unrender = unrenderSmall
