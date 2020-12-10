@@ -33,6 +33,10 @@ library
 
 executable task-manager
   main-is:             Main.hs
+  other-modules:       Task,
+                       Task.IO,
+                       Task.CLI,
+                       Task.Codec
   build-depends:       base >=4.12 && < 5,
                        mtl >=2.2 && <3,
                        text >=1.2 && < 2,
