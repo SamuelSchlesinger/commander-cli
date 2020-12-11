@@ -219,7 +219,7 @@ data Arg :: Symbol -> * -> *
 data Opt :: Symbol -> Symbol -> * -> *
 
 -- | The type level 'flag' combinator, taking a name as input, allowing your
--- program to take flags with the syntax @~flag@.
+-- program to take flags that resolve to booleans in your program.
 data Flag :: Symbol -> *
 
 -- | The type level 'env'ironment variable combinator, taking a name as
