@@ -34,7 +34,7 @@ main = hspec do
 
   describe "option" do
     describe "opt" do
-      let program :: forall a. Unrender a => ProgramT (Opt "opt" "opt" a & Raw) IO (Maybe a)
+      let program :: forall a. Unrender a => ProgramT (Opt '["opt"] "opt" a & Raw) IO (Maybe a)
           program = opt \o -> raw $ pure o
       test "string option"   program (Just $ Just "hello" :: Maybe (Maybe String)) ["opt","hello"]
       test "int option"      program (Just $ Just 2       :: Maybe (Maybe Int))    ["opt","2"]
@@ -42,11 +42,29 @@ main = hspec do
       test "missing  value"  program (Just Nothing        :: Maybe (Maybe String)) ["opt"]
       test "missing  option" program (Just Nothing        :: Maybe (Maybe String)) ["abc"]
 
+    describe "optMulti" do
+      let program :: forall a. Unrender a => ProgramT (Opt '["opt","another"] "opt" a & Raw) IO (Maybe a)
+          program = optMulti \o -> raw $ pure o
+      test "string first option"   program (Just $ Just "hello" :: Maybe (Maybe String)) ["opt","hello"]
+      test "int second option"     program (Just $ Just 2       :: Maybe (Maybe Int))    ["another","2"]
+      test "unrender first error"  program (Nothing             :: Maybe (Maybe Int))    ["opt","abc"]
+      test "unrender second error" program (Nothing             :: Maybe (Maybe Int))    ["another","abc"]
+      test "missing first value"   program (Just Nothing        :: Maybe (Maybe String)) ["opt"]
+      test "missing second value"  program (Just Nothing        :: Maybe (Maybe String)) ["another"]
+      test "missing  option"       program (Just Nothing        :: Maybe (Maybe String)) ["abc"]
+
     describe "optDef" do
-      let program :: ProgramT (Opt "o" "opt" String & Raw) IO String
+      let program :: ProgramT (Opt '["o"] "opt" String & Raw) IO String
           program = optDef "Default" \o -> raw $ pure o
       test "default option"  program (Just "Default") []
       test "option provided" program (Just "hello")   ["o","hello"]
+
+    describe "optDefMulti" do
+      let program :: a -> ProgramT (Opt '["o","another"] "opt" a & Raw) IO a
+          program defaultVal = optDefMulti defaultVal \o -> raw $ pure o
+      test "default option"         (program ("Default" :: String)) (Just "Default") []
+      test "option first provided"  (program ("Default" :: String)) (Just "hello")   ["o","hello"]
+      test "option second provided" (program (1         :: Int))    (Just 4)         ["another","4"]
 
   describe "flag" do
     let program :: ProgramT (Flag "flag" & Raw) IO Bool
@@ -64,7 +82,6 @@ main = hspec do
       test (Just "POOP" :: Maybe String)
       setEnv "ONOGOTTAFINDABIGNAME" "6"
       test (Just 6      :: Maybe Int)
-
     it "envOpt" do
       let program :: forall a. ProgramT (Env 'Optional "BIGNAME" a & Raw) IO (Maybe a)
           program = envOpt \e -> raw $ pure e
@@ -97,7 +114,7 @@ main = hspec do
     let program
           :: ProgramT
               ( "argument" & Arg "arg" String & Flag "flag" & Raw
-              + Opt "opt" "option-test" Word64 & "option" & Raw )
+              + Opt '["opt"] "option-test" Word64 & "option" & Raw )
               IO
               (Either (String,Bool) (Maybe Word64))
         program = (sub @"argument" $ arg $ \a -> flag $ \f -> raw $ pure $ Left (a,f)) <+>

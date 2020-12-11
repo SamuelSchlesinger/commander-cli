@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {- |
 Module: Options.Commander
 Description: A set of combinators for constructing and executing command line programs
@@ -69,7 +70,7 @@ module Options.Commander (
     variables as well. We also have a convenience combinator, 'toplevel',
     which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
+  arg, opt, optMulti, optDef, optDefMulti, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
   -- ** Run CLI Programs
   {- |
     To run a 'ProgramT' (a specification of a CLI program), you will 
@@ -137,7 +138,9 @@ import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Commander
 import Data.Tree
-import Options.Commander.Internal (showSymbol, showTypeRep)
+import Options.Commander.Internal (showSymbol, showTypeRep, SymbolList(symbolList))
+import Data.List (intercalate)
+
 
 type State = [Text]
 
@@ -216,7 +219,7 @@ data Arg :: Symbol -> * -> *
 -- | The type level 'opt'ion combinator, with a 'Symbol' designating the
 -- option's name and another representing the metavariables name for
 -- documentation purposes.
-data Opt :: Symbol -> Symbol -> * -> *
+data Opt :: [Symbol] -> Symbol -> * -> *
 
 -- | The type level 'flag' combinator, taking a name as input, allowing your
 -- program to take flags that resolve to booleans in your program.
@@ -327,19 +330,23 @@ instance HasProgram Raw where
   hoist n (RawProgramT m) = RawProgramT (n m)
   documentation = []
 
-instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => HasProgram (Opt option name t & p) where
-  data ProgramT (Opt option name t & p) m a = OptProgramT
+
+instance (SymbolList options, KnownSymbol name, HasProgram p, Unrender t) => HasProgram (Opt options name t & p) where
+  data ProgramT (Opt options name t & p) m a = OptProgramT
     { unOptProgramT :: Maybe t -> ProgramT p m a
     , unOptDefault :: Maybe t }
   run f = Action $ return . recurseOpt
     where
     recurseOpt = \case
-      d@(x:y:xs) | x == showSymbol @option -> maybe (Defeat,d) (\t -> (run $ unOptProgramT f $ Just t, xs)) $ unrender y
+      d@(x:y:xs)
+        | elem x $ symbolList @options -> case unrender y of
+           Just t -> (, xs) $ run $ unOptProgramT f $ Just t
+           Nothing -> (Defeat,d) 
       x:xs -> (x :) <$> recurseOpt xs
-      [] -> (run $ unOptProgramT f $ unOptDefault f, [])
+      [] -> (,[]) $ run $ unOptProgramT f $ unOptDefault f
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   documentation = [Node
-    ("option: " <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
+    ("option: " <> intercalate ", " (symbolList @options) <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
     (documentation @p)]
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
@@ -422,19 +429,44 @@ arg :: forall name x p m a.
 arg = ArgProgramT
 
 -- | Option combinator
-opt :: forall option name x p m a.
-       (KnownSymbol option, KnownSymbol name)
-    => (Maybe x -> ProgramT p m a) 
-    -> ProgramT (Opt option name x & p) m a
-opt = flip OptProgramT Nothing
+opt
+  :: forall option name x p m a.
+     (KnownSymbol option, KnownSymbol name)
+  => (Maybe x -> ProgramT p m a) 
+  -> ProgramT (Opt '[option] name x & p) m a
+-- opt = flip OptProgramT Nothing
+opt = optMulti
 
--- | Option combinator with default
-optDef :: forall option name x p m a.
+-- | Option combinator with multiple option matchs
+optMulti
+  :: forall options name x p m a.
+   (KnownSymbol name)
+  => (Maybe x -> ProgramT p m a) 
+  -> ProgramT (Opt options name x & p) m a
+optMulti = flip OptProgramT Nothing
+
+-- | Option combinator with a default value
+optDef
+  :: forall option name x p m a.
      (KnownSymbol option, KnownSymbol name)
   => x
   -> (x -> ProgramT p m a)
-  -> ProgramT (Opt option name x & p) m a
-optDef x f = OptProgramT { unOptDefault = Just x, unOptProgramT = \case { Just x -> f x; Nothing -> error "Violated invariant of optDef" } }
+  -> ProgramT (Opt '[option] name x & p) m a
+optDef = optDefMulti
+
+-- | Option combinator with a default value that has multiple option matchs
+optDefMulti
+  :: forall options name x p m a.
+     (SymbolList options, KnownSymbol name)
+  => x
+  -> (x -> ProgramT p m a)
+  -> ProgramT (Opt options name x & p) m a
+optDefMulti x f = OptProgramT
+  { unOptDefault = Just x
+  , unOptProgramT = \case
+    Just x -> f x
+    Nothing -> error "Violated invariant of optDef"
+  }
 
 -- | Boolean flag combinator
 flag :: forall f p m a.

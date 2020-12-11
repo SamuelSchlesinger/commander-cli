@@ -17,3 +17,7 @@ showSymbol = fromString $ symbolVal $ Proxy @a
 showTypeRep :: forall a b. (Typeable a, IsString b) => b
 showTypeRep = fromString $ show $ typeRep $ Proxy @a
 
+class SymbolList a where symbolList :: forall b. IsString b => [b]
+instance (KnownSymbol s, SymbolList ss) => SymbolList (s ': ss) where symbolList = showSymbol @s : symbolList @ss
+instance SymbolList '[] where symbolList = []
+
