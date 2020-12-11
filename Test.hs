@@ -67,10 +67,18 @@ main = hspec do
       test "option second provided" (program (1         :: Int))    (Just 4)         ["another","4"]
 
   describe "flag" do
-    let program :: ProgramT (Flag "flag" & Raw) IO Bool
-        program = flag $ raw . pure
-    test "has flag" program (Just True)  ["flag"]
-    test "no flag"  program (Just False) []
+    describe "flag" do
+      let program :: ProgramT (Flag '["flag"] & Raw) IO Bool
+          program = flag $ raw . pure
+      test "has flag"     program (Just True)  ["flag"]
+      test "missing flag" program (Just False) []
+
+    describe "flagMulti" do
+      let program :: ProgramT (Flag '["flag","another"] & Raw) IO Bool
+          program = flagMulti $ raw . pure
+      test "has first flag"  program (Just True)  ["flag"]
+      test "has second flag" program (Just True)  ["another"]
+      test "missing flag"    program (Just False) []
 
   describe "env" do
     it "env" do
@@ -113,7 +121,7 @@ main = hspec do
   describe "bigProgTests" do
     let program
           :: ProgramT
-              ( "argument" & Arg "arg" String & Flag "flag" & Raw
+              ( "argument" & Arg "arg" String & Flag '["flag"] & Raw
               + Opt '["opt"] "option-test" Word64 & "option" & Raw )
               IO
               (Either (String,Bool) (Maybe Word64))

@@ -70,7 +70,7 @@ module Options.Commander (
     variables as well. We also have a convenience combinator, 'toplevel',
     which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optMulti, optDef, optDefMulti, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
+  arg, opt, optMulti, optDef, optDefMulti, raw, sub, named, flag, flagMulti, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
   -- ** Run CLI Programs
   {- |
     To run a 'ProgramT' (a specification of a CLI program), you will 
@@ -223,7 +223,7 @@ data Opt :: [Symbol] -> Symbol -> * -> *
 
 -- | The type level 'flag' combinator, taking a name as input, allowing your
 -- program to take flags that resolve to booleans in your program.
-data Flag :: Symbol -> *
+data Flag :: [Symbol] -> *
 
 -- | The type level 'env'ironment variable combinator, taking a name as
 -- input, allowing your program to take environment variables as input
@@ -349,18 +349,18 @@ instance (SymbolList options, KnownSymbol name, HasProgram p, Unrender t) => Has
     ("option: " <> intercalate ", " (symbolList @options) <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
     (documentation @p)]
 
-instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
-  newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
+instance (SymbolList flags, HasProgram p) => HasProgram (Flag flags & p) where
+  newtype ProgramT (Flag flags & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
   run f = Action $ return . first (run . unFlagProgramT f) . recurseFlag
     where
     recurseFlag :: State -> (Bool,State)
     recurseFlag = \case
-      x:xs | x == showSymbol @flag -> (True,xs)
+      x:xs | elem x $ symbolList @flags -> (True,xs)
            | otherwise -> (x :) <$> recurseFlag xs
       [] -> (False,[])
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
   documentation = [Node
-    ("flag: " <> showSymbol @flag)
+    ("flag: " <> intercalate ", " (symbolList @flags))
     (documentation @p)]
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
@@ -469,11 +469,19 @@ optDefMulti x f = OptProgramT
   }
 
 -- | Boolean flag combinator
-flag :: forall f p m a.
-        KnownSymbol f 
+flag :: forall flag p m a.
+        KnownSymbol flag 
      => (Bool -> ProgramT p m a) 
-     -> ProgramT (Flag f & p) m a
+     -> ProgramT (Flag '[flag] & p) m a
 flag = FlagProgramT
+
+-- | Boolean flag combinator
+flagMulti
+  :: forall flags p m a.
+     SymbolList flags 
+  => (Bool -> ProgramT p m a) 
+  -> ProgramT (Flag flags & p) m a
+flagMulti = FlagProgramT
 
 -- | Required environment variable combinator
 env :: forall name p x m a.
