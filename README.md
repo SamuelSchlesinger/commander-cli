@@ -305,7 +305,7 @@ can use any parsing library or whatever you want. Next, we have the class
 ```haskell
 class HasProgram p where
   data ProgramT p m a
-  run :: ProgramT p IO a -> CommanderT [Text] IO a
+  run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
   documentation :: Forest String
 ```

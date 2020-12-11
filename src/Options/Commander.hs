@@ -105,7 +105,7 @@ module Options.Commander (
     The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.
     It has the ability to backtrack and it maintains some state.
   -}
-  CommanderT(Action, Defeat, Victory), runCommanderT,
+  CommanderT(Action, Defeat, Victory), runCommanderT, State,
   -- ** Middleware for CommanderT
   {- |
     If you want to modify your interpreted CLI program, in its 'CommanderT'
@@ -138,6 +138,8 @@ import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Commander
 import Data.Tree
 import Options.Commander.Internal (showSymbol, showTypeRep)
+
+type State = [Text]
 
 -- | A class for interpreting command line arguments into Haskell types.
 class Typeable t => Unrender t where
@@ -253,7 +255,7 @@ infixr 2 +
 
 -- | This is the workhorse of the library. Basically, it allows you to 
 -- 'run' your 'ProgramT'
--- representation of your program as a 'CommanderT' and pump the '[Text]'
+-- representation of your program as a 'CommanderT' and pump the 'State'
 -- through it until you've processed all of the arguments, options, and
 -- flags that you have specified must be used in your 'ProgramT'. You can
 -- think of 'ProgramT' as a useful syntax for command line programs, but
@@ -264,7 +266,7 @@ infixr 2 +
 -- 'usage' programs.
 class HasProgram p where
   data ProgramT p (m :: * -> *) a
-  run :: ProgramT p IO a -> CommanderT [Text] IO a
+  run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
   documentation :: Forest String
 
@@ -359,7 +361,7 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
   newtype ProgramT (Flag flag & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
   run f = Action $ return . first (run . unFlagProgramT f) . recurseFlag
     where
-    recurseFlag :: [Text] -> (Bool,[Text])
+    recurseFlag :: State -> (Bool,State)
     recurseFlag = \case
       x:xs | x == showSymbol @flag -> (True,xs)
            | otherwise -> (x :) <$> recurseFlag xs
@@ -405,22 +407,6 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
     ("subprogram: " <> showSymbol @sub)
     (documentation @p)]
 
--- -- | A simple default for getting out the arguments, options, and flags
--- -- using 'getArgs'. We use the syntax ~flag for flags and -opt
--- -- for options, with arguments using the typical ordered representation.
--- initialState :: IO State
--- initialState = do
---   args <- getArgs
---   let (opts, args', flags) = takeOptions args
---   return $ State args' (HashMap.fromList opts) (HashSet.fromList flags) 
---     where
---       takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
---       takeOptions = go [] [] [] where
---         go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
---         go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
---         go opts args flags (x : y) = go opts (pack x : args) flags y
---         go opts args flags [] = (opts, reverse args, flags)
-
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags that I get using the 'initialState' function,
 -- ignoring the output of the program.
@@ -442,29 +428,11 @@ command :: forall p a.
 -- command prog = initialState >>= runCommanderT (run prog)
 command prog = runCommanderT (run prog) . fmap pack =<< getArgs
 
--- | Environment 
-
--- | Required environment variable combinator
-env :: forall name p x m a.
-     KnownSymbol name
-  => (x -> ProgramT p m a)
-  -> ProgramT (Env 'Required name x & p) m a
-env = EnvProgramT'Required
-
--- | Optional environment variable combinator
-envOpt :: forall name x p m a.
-     KnownSymbol name
-  => (Maybe x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional name x & p) m a
-envOpt = flip EnvProgramT'Optional Nothing
-
--- | Optional environment variable combinator with default
-envOptDef :: forall name x p m a.
-     KnownSymbol name
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional name x & p) m a
-envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Optional = \case { Just x -> f x; Nothing -> error "Violated invariant of optEnvDef" } }
+-- | Raw monadic combinator
+raw :: forall m a.
+       m a 
+    -> ProgramT Raw m a
+raw = RawProgramT
 
 -- | Argument combinator
 arg :: forall name x p m a.
@@ -488,11 +456,34 @@ optDef :: forall option name x p m a.
   -> ProgramT (Opt option name x & p) m a
 optDef x f = OptProgramT { unOptDefault = Just x, unOptProgramT = \case { Just x -> f x; Nothing -> error "Violated invariant of optDef" } }
 
--- | Raw monadic combinator
-raw :: forall m a.
-       m a 
-    -> ProgramT Raw m a
-raw = RawProgramT
+-- | Boolean flag combinator
+flag :: forall f p m a.
+        KnownSymbol f 
+     => (Bool -> ProgramT p m a) 
+     -> ProgramT (Flag f & p) m a
+flag = FlagProgramT
+
+-- | Required environment variable combinator
+env :: forall name p x m a.
+     KnownSymbol name
+  => (x -> ProgramT p m a)
+  -> ProgramT (Env 'Required name x & p) m a
+env = EnvProgramT'Required
+
+-- | Optional environment variable combinator
+envOpt :: forall name x p m a.
+     KnownSymbol name
+  => (Maybe x -> ProgramT p m a)
+  -> ProgramT (Env 'Optional name x & p) m a
+envOpt = flip EnvProgramT'Optional Nothing
+
+-- | Optional environment variable combinator with default
+envOptDef :: forall name x p m a.
+     KnownSymbol name
+  => x
+  -> (x -> ProgramT p m a)
+  -> ProgramT (Env 'Optional name x & p) m a
+envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Optional = \case { Just x -> f x; Nothing -> error "Violated invariant of optEnvDef" } }
 
 -- | Subcommand combinator
 sub :: forall s p m a.
@@ -509,13 +500,6 @@ named :: forall s p m a.
       => ProgramT p m a 
       -> ProgramT (Named s & p) m a
 named = NamedProgramT
-
--- | Boolean flag combinator
-flag :: forall f p m a.
-        KnownSymbol f 
-     => (Bool -> ProgramT p m a) 
-     -> ProgramT (Flag f & p) m a
-flag = FlagProgramT
 
 -- | A convenience combinator that constructs the program I often want
 -- to run out of a program I want to write.
@@ -552,7 +536,7 @@ description = DescriptionProgramT
 -- | The type of middleware, which can transform interpreted command line programs
 -- by meddling with arguments, options, or flags, or by adding effects for
 -- every step. You can also change the underlying monad.
-type Middleware m n = forall a. CommanderT [Text] m a -> CommanderT [Text] n a
+type Middleware m n = forall a. CommanderT State m a -> CommanderT State n a
 
 -- | Middleware to transform the base monad with a natural transformation.
 transform :: (Monad m, Monad n) => (forall a. m a -> n a) -> Middleware m n
