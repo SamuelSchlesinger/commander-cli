@@ -98,7 +98,7 @@ Okay, so we can expand the documentation. But what if I have an option to pass t
 ```haskell
 main = command_
   . toplevel @"argument-taker"
-  . optDef @"m" @"mode" "Print" $ \mode ->
+  . optDef @"-m" @"mode" "Print" $ \mode ->
     arg @"example-argument" $ \arg ->
     description @"Takes the argument and prints it or not, depending on the mode" 
   . raw $ do
@@ -127,9 +127,9 @@ example program:
 ```haskell
 main = command_
   . toplevel @"argument-taker"
-  . optDef @"m" @"mode" "Print" $ \mode ->
+  . optDef @"-m" @"mode" "Print" $ \mode ->
     arg @"example-argument" $ \arg ->
-    flag @"loud" $ \loud ->
+    flag @"~loud" $ \loud ->
     description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
   . raw $ do
       let msg = if loud then map toUpper arg <> "!" else arg
@@ -162,9 +162,9 @@ main = command_
   $ defaultProgram <+> sub @"shriek" (raw (putStrLn "AHHHHH!!"))
   where
   defaultProgram = 
-      optDef @"m" @"mode" "Print" $ \mode ->
+      optDef @"-m" @"mode" "Print" $ \mode ->
       arg @"example-argument" $ \arg ->
-      flag @"loud" $ \loud ->
+      flag @"~loud" $ \loud ->
       description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
     . raw $ do
         let msg = if loud then map toUpper arg <> "!" else arg
@@ -208,9 +208,9 @@ main = command_
       )
   where
   defaultProgram argumentTakerDirectory = 
-      optDef @"m" @"mode" "Print" $ \mode ->
+      optDef @"-m" @"mode" "Print" $ \mode ->
       arg @"example-argument" $ \arg ->
-      flag @"loud" $ \loud ->
+      flag @"~loud" $ \loud ->
       description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
     . raw $ do
         setCurrentDirectory argumentTakerDirectory
@@ -259,9 +259,9 @@ main = command_
       )
   where
   defaultProgram argumentTakerDirectory = 
-      optDef @"m" @"mode" "Print" $ \mode ->
+      optDef @"-m" @"mode" "Print" $ \mode ->
       arg @"example-argument" $ \arg ->
-      flag @"loud" $ \loud ->
+      flag @"~loud" $ \loud ->
       description @"Takes the argument and prints it or not, depending on the mode" 
     . raw $ do
         setCurrentDirectory argumentTakerDirectory
