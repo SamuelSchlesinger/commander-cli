@@ -308,13 +308,6 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
   run f = Action $ return . \case
     (unrender -> Just x):xs -> (run $ unArgProgramT f x, xs)
     xs -> (Defeat,xs)
-  -- run f = Action $ \State{..} -> do
-  --   case arguments of
-  --     (x : xs) -> 
-  --       case unrender x of
-  --         Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
-  --         Nothing -> return (Defeat, State{..})
-  --     [] -> return (Defeat, State{..})
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
   documentation = [Node
     ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t)
@@ -344,17 +337,9 @@ instance (KnownSymbol name, KnownSymbol option, HasProgram p, Unrender t) => Has
       d@(x:y:xs) | x == showSymbol @option -> maybe (Defeat,d) (\t -> (run $ unOptProgramT f $ Just t, xs)) $ unrender y
       x:xs -> (x :) <$> recurseOpt xs
       [] -> (run $ unOptProgramT f $ unOptDefault f, [])
-  -- run f = Action $ \State{..} -> do
-  --   case HashMap.lookup (showSymbol @option) options of
-  --     Just opt' -> 
-  --       case unrender opt' of
-  --         Just t -> return (run (unOptProgramT f (Just t)), State{..})
-  --         Nothing -> return (Defeat, State{..})
-  --     Nothing  -> return (run (unOptProgramT f (unOptDefault f)), State{..})
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   documentation = [Node
     ("option: " <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
-    -- ("option: -" <> showSymbol @option <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
     (documentation @p)]
 
 instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
@@ -366,13 +351,9 @@ instance (KnownSymbol flag, HasProgram p) => HasProgram (Flag flag & p) where
       x:xs | x == showSymbol @flag -> (True,xs)
            | otherwise -> (x :) <$> recurseFlag xs
       [] -> (False,[])
-  -- run f = Action $ \State{..} -> do
-  --   let presence = HashSet.member (showSymbol @flag) flags
-  --   return (run (unFlagProgramT f presence), State{..})
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
   documentation = [Node
     ("flag: " <> showSymbol @flag)
-    -- ("flag: ~" <> showSymbol @flag)
     (documentation @p)]
 
 instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
@@ -425,7 +406,6 @@ command :: forall p a.
            HasProgram p 
         => ProgramT p IO a 
         -> IO (Maybe a)
--- command prog = initialState >>= runCommanderT (run prog)
 command prog = runCommanderT (run prog) . fmap pack =<< getArgs
 
 -- | Raw monadic combinator
