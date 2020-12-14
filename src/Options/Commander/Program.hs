@@ -22,7 +22,7 @@ class HasProgram p where
   data ProgramT p (m :: * -> *) a
   run :: ProgramT p IO a -> CommanderT State IO a
   hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
-  documentation :: Forest String
+  documentation :: ProgramT p m a -> Forest String
 
 type State = [Text]
 
@@ -48,6 +48,6 @@ command prog = runCommanderT (run prog) . fmap pack =<< getArgs
 
 -- | Produce a 2-dimensional textual drawing of the 'Tree' description of
 -- this program.
-document :: forall p. HasProgram p => String
-document = drawForest (documentation @p)
+document :: HasProgram p => ProgramT p m a -> String
+document = drawForest . documentation
 

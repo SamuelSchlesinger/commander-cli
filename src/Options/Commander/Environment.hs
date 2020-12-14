@@ -21,9 +21,12 @@ instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Requir
       Just t -> run $ unEnvProgramT'Required f t
       Nothing -> Defeat
   hoist n (EnvProgramT'Required f) = EnvProgramT'Required (hoist n . f)
-  documentation = [Node
-    ("required env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
-    (documentation @p)]
+  documentation
+    = pure
+    . Node ("required env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
+    . documentation
+    . 
+    . unEnvProgramT'Required
 
 instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Optional names t & p) where
   data ProgramT (Env 'Optional names t & p) m a = EnvProgramT'Optional
@@ -38,6 +41,11 @@ instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Option
       [] -> Defeat
       x:_ -> run $ unEnvProgramT'Optional f $ Just x
   hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
+  documentation
+    = pure
+    . Node ("optional env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
+    . documentation
+    . unEnvDefault
   documentation = [Node
     ("optional env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
     (documentation @p)]

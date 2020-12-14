@@ -1,5 +1,6 @@
 module Options.Commander.Imports
   ( module Control.Monad.Commander
+  , module Data.Coerce
   , module Data.Tree
   , module GHC.TypeLits
   , module Options.Commander.Internal
@@ -9,6 +10,7 @@ module Options.Commander.Imports
   ) where
 
 import Control.Monad.Commander
+import Data.Coerce
 import Data.Tree (Tree(Node), Forest)
 import GHC.TypeLits (Symbol, KnownSymbol)
 import Options.Commander.Internal

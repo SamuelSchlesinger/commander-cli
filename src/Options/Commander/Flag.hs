@@ -18,9 +18,7 @@ instance (SymbolList flags, HasProgram p) => HasProgram (Flag flags & p) where
            | otherwise -> (x :) <$> recurseFlag xs
       [] -> (False,[])
   hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
-  documentation = [Node
-    ("flag: " <> intercalate ", " (symbolList @flags))
-    (documentation @p)]
+  documentation = pure . Node ("flag: " <> intercalate ", " (symbolList @flags)) . documentation . unFlagProgramT
 
 -- | Boolean flag combinator
 flag :: forall flag p m a.

@@ -11,9 +11,7 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (Sub sub & p) where
     x:xs | x == showSymbol @sub -> (run $ unSubProgramT s, xs)
     x -> (Defeat, x)
   hoist n = SubProgramT . hoist n . unSubProgramT
-  documentation = [Node
-    ("subprogram: " <> showSymbol @sub)
-    (documentation @p)]
+  documentation = pure . Node ("subprogram: " <> showSymbol @sub) (documentation @p) . documentation . unSubProgramT
 
 -- | Subcommand combinator
 sub :: forall s p m a.

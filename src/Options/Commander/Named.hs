@@ -15,9 +15,7 @@ instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
   newtype ProgramT (Named name & p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
   run = run . unNamedProgramT 
   hoist n = NamedProgramT . hoist n . unNamedProgramT
-  documentation = [Node
-    ("name: " <> showSymbol @name)
-    (documentation @p)]
+  documentation = pure . Node ("name: " <> showSymbol @name) . documentation unNamedProgramT
 
 -- | Named command combinator, useful at the top level for naming
 -- a program. Typically, the name will be the name or alias of the

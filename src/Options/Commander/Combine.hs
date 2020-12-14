@@ -15,7 +15,7 @@ instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
   data ProgramT (x + y) m a = ProgramT x m a :+: ProgramT y m a
   run (f :+: g) = run f <|> run g
   hoist n (f :+: g) = hoist n f :+: hoist n g
-  documentation = documentation @x <> documentation @y
+  documentation (x :+: y) = documentation x <> documentation y
 infixr 2 :+:
 
 -- | The command line program which consists of trying to enter one and

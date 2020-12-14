@@ -12,7 +12,7 @@ instance HasProgram Raw where
   newtype ProgramT Raw m a = RawProgramT { unRawProgramT :: m a }
   run = liftIO . unRawProgramT
   hoist n (RawProgramT m) = RawProgramT (n m)
-  documentation = []
+  documentation = const []
 
 -- | Raw monadic combinator
 raw :: forall m a.
