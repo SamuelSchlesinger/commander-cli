@@ -6,6 +6,9 @@ module Options.Commander.Imports
   , module Options.Commander.Program
   , module Options.Commander.Sequence
   , module Options.Commander.Unrender
+
+  , module Data.Function
+  , module Data.Functor
   ) where
 
 import Control.Monad.Commander
@@ -15,4 +18,7 @@ import Options.Commander.Internal
 import Options.Commander.Program (HasProgram(ProgramT,run,hoist,documentation), State)
 import Options.Commander.Sequence
 import Options.Commander.Unrender
+
+import Data.Function
+import Data.Functor
 

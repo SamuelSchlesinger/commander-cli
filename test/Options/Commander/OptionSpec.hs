@@ -6,7 +6,7 @@ import Test
 spec :: Spec
 spec = do
   describe "opt" do
-    let program :: forall a. Unrender a => ProgramT (Opt '["opt"] "opt" a & Raw) IO (Maybe a)
+    let program :: forall a. Unrender a => ProgramT (Opt '["opt"] "opt" 'Nothing a & Raw) IO (Maybe a)
         program = opt \o -> raw $ pure o
     testProgram "string option"        program (Just $ Just "hello" :: Maybe (Maybe String)) ["opt","hello"]
     testProgram "int option"           program (Just $ Just 2       :: Maybe (Maybe Int))    ["opt","2"]
@@ -16,7 +16,7 @@ spec = do
     testProgram "not at head of state" program (Just $ Just 3       :: Maybe (Maybe Int))    ["notopt","opt","3"]
 
   describe "optMulti" do
-    let program :: forall a. Unrender a => ProgramT (Opt '["opt","another"] "opt" a & Raw) IO (Maybe a)
+    let program :: forall a. Unrender a => ProgramT (Opt '["opt","another"] "opt" 'Nothing a & Raw) IO (Maybe a)
         program = optMulti \o -> raw $ pure o
     testProgram "string first option"   program (Just $ Just "hello" :: Maybe (Maybe String)) ["opt","hello"]
     testProgram "int second option"     program (Just $ Just 2       :: Maybe (Maybe Int))    ["another","2"]
@@ -27,15 +27,15 @@ spec = do
     testProgram "missing  option"       program (Just Nothing        :: Maybe (Maybe String)) ["abc"]
 
   describe "optDef" do
-    let program :: ProgramT (Opt '["o"] "opt" String & Raw) IO String
-        program = optDef "Default" \o -> raw $ pure o
+    let program :: ProgramT (Opt '["o"] "opt" ('Just "Default") String & Raw) IO String
+        program = optDef \o -> raw $ pure o
     testProgram "default option"  program (Just "Default") []
     testProgram "option provided" program (Just "hello")   ["o","hello"]
 
   describe "optDefMulti" do
-    let program :: a -> ProgramT (Opt '["o","another"] "opt" a & Raw) IO a
-        program defaultVal = optDefMulti defaultVal \o -> raw $ pure o
-    testProgram "default option"         (program ("Default" :: String)) (Just "Default") []
-    testProgram "option first provided"  (program ("Default" :: String)) (Just "hello")   ["o","hello"]
-    testProgram "option second provided" (program (1         :: Int))    (Just 4)         ["another","4"]
+    let program :: forall def a. ProgramT (Opt '["o","another"] "opt" ('Just def) a & Raw) IO a
+        program = optDefMulti \o -> raw $ pure o
+    testProgram "default option"         (program @"Default" @String) (Just "Default") []
+    testProgram "option first provided"  (program @"Default" @String) (Just "hello")   ["o","hello"]
+    testProgram "option second provided" (program @"1"       @Int)    (Just 4)         ["another","4"]
 
