@@ -17,9 +17,9 @@ instance (SymbolList options, KnownSymbol name, HasProgram p, Unrender t) => Has
     recurseOpt = \case
       d@(x:y:xs)
         | elem x $ symbolList @options -> case unrender y of
-           Just t -> (, xs) $ run $ unOptProgramT f $ Just t
+           Just t -> (,xs) $ run $ unOptProgramT f $ Just t
            Nothing -> (Defeat,d) 
-      x:xs -> (x :) <$> recurseOpt xs
+      x:xs -> (x:) <$> recurseOpt xs
       [] -> (,[]) $ run $ unOptProgramT f $ unOptDefault f
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
   documentation = [Node
@@ -61,8 +61,5 @@ optDefMulti
 optDefMulti x f = OptProgramT
   { unOptDefault = Just x
   , unOptProgramT = maybe (error "Violated invariant of optDef") f
-  -- , unOptProgramT = \case
-  --   Just x -> f x
-  --   Nothing -> error "Violated invariant of optDef"
   }
 

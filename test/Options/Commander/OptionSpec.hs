@@ -8,11 +8,12 @@ spec = do
   describe "opt" do
     let program :: forall a. Unrender a => ProgramT (Opt '["opt"] "opt" a & Raw) IO (Maybe a)
         program = opt \o -> raw $ pure o
-    testProgram "string option"   program (Just $ Just "hello" :: Maybe (Maybe String)) ["opt","hello"]
-    testProgram "int option"      program (Just $ Just 2       :: Maybe (Maybe Int))    ["opt","2"]
-    testProgram "unrender error"  program (Nothing             :: Maybe (Maybe Int))    ["opt","abc"]
-    testProgram "missing  value"  program (Just Nothing        :: Maybe (Maybe String)) ["opt"]
-    testProgram "missing  option" program (Just Nothing        :: Maybe (Maybe String)) ["abc"]
+    testProgram "string option"        program (Just $ Just "hello" :: Maybe (Maybe String)) ["opt","hello"]
+    testProgram "int option"           program (Just $ Just 2       :: Maybe (Maybe Int))    ["opt","2"]
+    testProgram "unrender error"       program (Nothing             :: Maybe (Maybe Int))    ["opt","abc"]
+    testProgram "missing  value"       program (Just Nothing        :: Maybe (Maybe String)) ["opt"]
+    testProgram "missing  option"      program (Just Nothing        :: Maybe (Maybe String)) ["abc"]
+    testProgram "not at head of state" program (Just $ Just 3       :: Maybe (Maybe Int))    ["notopt","opt","3"]
 
   describe "optMulti" do
     let program :: forall a. Unrender a => ProgramT (Opt '["opt","another"] "opt" a & Raw) IO (Maybe a)
