@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 {- |
 Module: Options.Commander
 Description: A set of combinators for constructing and executing command line programs
@@ -53,13 +52,6 @@ interfaces quickly and easily, with somewhat useful help messages, and
 not have to write any boilerplate.
 -}
 module Options.Commander (
-  -- ** Parsing Arguments and Options
-  {- |
-    If you want to use a Haskell type as an argument or option, you will need
-    to implement the 'Unrender' class. Your type needs to be 'Typeable' for
-    the sake of generating documentation.
-  -}
-  Unrender(unrender),
   -- ** Defining CLI Programs
   {- |
     To construct a 'ProgramT' (a specification of a CLI program), you can
@@ -70,470 +62,85 @@ module Options.Commander (
     variables as well. We also have a convenience combinator, 'toplevel',
     which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optMulti, optDef, optDefMulti, raw, sub, named, flag, flagMulti, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
-  -- ** Run CLI Programs
-  {- |
-    To run a 'ProgramT' (a specification of a CLI program), you will 
-    need to use 'command' or 'command_'.
-  -}
-  command, command_,
   {- |
     Each 'ProgramT' has a type level description, build from these type level
     combinators.
   -}
-  type (&), type (+), Arg, Opt, Named, Raw, Flag, Env, Optionality(Required, Optional), Description, Annotated,
+    toplevel, usage
+  , module  Options.Commander.Annotated
+  , module  Options.Commander.Argument
+  , module  Options.Commander.Combine
+  , module  Options.Commander.Description
+  , module  Options.Commander.Environment
+  , module  Options.Commander.Flag
+  , module  Options.Commander.Imports
+  , module  Options.Commander.Internal
+  , module  Options.Commander.Middleware
+  , module  Options.Commander.Named
+  , module  Options.Commander.Option
+  , module  Options.Commander.Raw
+  , module  Options.Commander.Sequence
+  , module  Options.Commander.Subcommand
+
   -- ** Interpreting CLI Programs
   {- |
     The 'HasProgram' class forms the backbone of this library, defining the
     syntax for CLI programs using the 'ProgramT' data family, and defining
     the interpretation of all of the various pieces of a CLI.
   -}
-  HasProgram(ProgramT, run, hoist, documentation),
-  ProgramT(ArgProgramT, unArgProgramT,
-           OptProgramT, unOptProgramT, unOptDefault,
-           RawProgramT, unRawProgramT,
-           SubProgramT, unSubProgramT,
-           NamedProgramT, unNamedProgramT,
-           FlagProgramT, unFlagProgramT,
-           EnvProgramT'Optional, unEnvProgramT'Optional, unEnvDefault,
-           EnvProgramT'Required, unEnvProgramT'Required,
-           DescriptionProgramT,
-           AnnotatedProgramT,
-           (:+:)
-           ),
+  -- ** Run CLI Programs
+  {- |
+    To run a 'ProgramT' (a specification of a CLI program), you will 
+    need to use 'command' or 'command_'.
+  -}
+  , module  Options.Commander.Program
+
+  -- ** Parsing Arguments and Options
+  {- |
+    If you want to use a Haskell type as an argument or option, you will need
+    to implement the 'Unrender' class. Your type needs to be 'Typeable' for
+    the sake of generating documentation.
+  -}
+  , module  Options.Commander.Unrender
+
   -- ** The CommanderT Monad
   {- |
     The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.
     It has the ability to backtrack and it maintains some state.
   -}
-  CommanderT(Action, Defeat, Victory), runCommanderT, State,
-  -- ** Middleware for CommanderT
-  {- |
-    If you want to modify your interpreted CLI program, in its 'CommanderT'
-    form, you can use the concept of 'Middleware'. A number of these are
-    provided for debugging complex CLI programs, in case they aren't doing
-    what you'd expect.
-  -}
-  Middleware, logState, transform, withActionEffects, withDefeatEffects, withVictoryEffects
+  , module Control.Monad.Commander
 ) where
 
-import Control.Applicative (Alternative(..))
-import Control.Arrow (first)
-import Control.Monad (ap, void, (<=<))
-import Control.Monad.Trans (MonadIO(..), MonadTrans(..))
-import Data.Functor (($>))
-import Data.HashMap.Strict as HashMap
-import Data.HashSet as HashSet
-import Data.Int
-import Data.Text (Text, pack, unpack, stripPrefix, find)
-import Data.Text.Read (decimal, signed)
-import Data.Word
 import GHC.TypeLits (Symbol, KnownSymbol)
-import GHC.Generics (Generic)
-import Numeric.Natural
-import System.Environment (getArgs, lookupEnv)
-import Data.Typeable (Typeable)
-import qualified Data.ByteString as SBS
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.ByteString.Lazy as LBS
+import Control.Monad.IO.Class (MonadIO(liftIO))
+
 import Control.Monad.Commander
-import Data.Tree
-import Options.Commander.Internal (showSymbol, showTypeRep, SymbolList(symbolList))
-import Data.List (intercalate)
 
+import Options.Commander.Annotated
+import Options.Commander.Argument
+import Options.Commander.Combine
+import Options.Commander.Description
+import Options.Commander.Environment
+import Options.Commander.Flag
+import Options.Commander.Imports
+import Options.Commander.Internal
+import Options.Commander.Middleware
+import Options.Commander.Named
+import Options.Commander.Option
+import Options.Commander.Program
+import Options.Commander.Raw
+import Options.Commander.Sequence
+import Options.Commander.Subcommand
+import Options.Commander.Unrender
 
-type State = [Text]
-
--- | A class for interpreting command line arguments into Haskell types.
-class Typeable t => Unrender t where
-  unrender :: Text -> Maybe t
-
-instance Unrender String where
-  unrender = Just . unpack
-
-instance Unrender Text where
-  unrender = Just
-
-instance Unrender SBS.ByteString where
-  unrender = Just . BS8.pack . unpack
-
-instance Unrender LBS.ByteString where
-  unrender = fmap LBS.fromStrict <$> unrender
-
--- | A useful default unrender for small, bounded data types.
-unrenderSmall :: (Enum a, Bounded a, Show a) => Text -> Maybe a
-unrenderSmall = flip Prelude.lookup [(pack $ show x, x) | x <- [minBound..maxBound]]
-
-instance Unrender () where
-  unrender = unrenderSmall
-
-instance (Unrender a, Unrender b) => Unrender (Either a b) where
-  unrender x = leftCase x <|> rightCase x where
-    leftCase  = fmap Left  . unrender
-    rightCase = fmap Right . unrender
-
-instance Unrender Bool where
-  unrender = unrenderSmall
-
-newtype WrappedIntegral i = WrappedIntegral i
-  deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
-
-instance (Typeable i, Integral i) => Unrender (WrappedIntegral i) where
-  unrender = either (const Nothing) h . signed decimal where
-    h (n, "") = Just (fromInteger n)
-    h _ = Nothing
-
-deriving via WrappedIntegral Integer instance Unrender Integer
-deriving via WrappedIntegral Int instance Unrender Int
-deriving via WrappedIntegral Int8 instance Unrender Int8
-deriving via WrappedIntegral Int16 instance Unrender Int16
-deriving via WrappedIntegral Int32 instance Unrender Int32
-deriving via WrappedIntegral Int64 instance Unrender Int64
-
-newtype WrappedNatural i = WrappedNatural i
-  deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
-
-instance (Typeable i, Integral i) => Unrender (WrappedNatural i) where
-  unrender = either (const Nothing) h . decimal where
-    h (n, "") = if n >= 0 then Just (fromInteger n) else Nothing
-    h _ = Nothing 
-
-deriving via WrappedNatural Natural instance Unrender Natural
-deriving via WrappedNatural Word instance Unrender Word
-deriving via WrappedNatural Word8 instance Unrender Word8
-deriving via WrappedNatural Word16 instance Unrender Word16
-deriving via WrappedNatural Word32 instance Unrender Word32
-deriving via WrappedNatural Word64 instance Unrender Word64
-
-instance Unrender Char where
-  unrender = find (const True)
-
--- | The type level combinator for constructing 'named' programs, giving your
--- program a name at the toplevel for the sake of documentation.
-data Named :: Symbol -> *
-
--- | The type level 'arg'ument combinator, with a 'Symbol' designating the
--- name of that argument.
-data Arg :: Symbol -> * -> *
-
--- | The type level 'opt'ion combinator, with a 'Symbol' designating the
--- option's name and another representing the metavariables name for
--- documentation purposes.
-data Opt :: [Symbol] -> Symbol -> * -> *
-
--- | The type level 'flag' combinator, taking a name as input, allowing your
--- program to take flags that resolve to booleans in your program.
-data Flag :: [Symbol] -> *
-
--- | The type level 'env'ironment variable combinator, taking a name as
--- input, allowing your program to take environment variables as input
--- automatically.
-data Env :: Optionality -> Symbol -> * -> *
-
--- | The type level 'raw' monadic program combinator, allowing a command line
--- program to just do some computation.
-data Raw :: *
-
--- | The type level 'description' combinator, allowing a command line program
--- to have better documentation.
-data Description :: Symbol -> *
-
--- | The type level 'annotated' combinator, allowing a command line 
-data Annotated :: Symbol -> * -> *
-
--- | The type level tag for whether or not a variable is required or not.
-data Optionality = Required | Optional
-
--- | The type level program sequencing combinator, taking two program types
--- and sequencing them one after another.
-data (&) :: k -> * -> *
-infixr 4 &
-
--- | The type level combining combinator, taking two program types as
--- input, and being interpreted as a program which attempts to run the
--- first command line program and, if parsing its flags, subprograms,
--- options or arguments fails, runs the second, otherwise failing.
-data a + b
-infixr 2 +
-
--- | This is the workhorse of the library. Basically, it allows you to 
--- 'run' your 'ProgramT'
--- representation of your program as a 'CommanderT' and pump the 'State'
--- through it until you've processed all of the arguments, options, and
--- flags that you have specified must be used in your 'ProgramT'. You can
--- think of 'ProgramT' as a useful syntax for command line programs, but
--- 'CommanderT' as the semantics of that program. We also give the ability
--- to 'hoist' 'ProgramT' actions between monads if you can uniformly turn
--- computations in one into another. We also store 'documentation' in the
--- form of a @'Forest' 'String'@, in order to automatically generate
--- 'usage' programs.
-class HasProgram p where
-  data ProgramT p (m :: * -> *) a
-  run :: ProgramT p IO a -> CommanderT State IO a
-  hoist :: (forall x. m x -> n x) -> ProgramT p m a -> ProgramT p n a
-  documentation :: Forest String
-
-instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Required name t & p) where
-  newtype ProgramT (Env 'Required name t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
-  run f = Action $ \state -> do
-    val <- lookupEnv $ showSymbol @name
-    case val of
-      Just v ->
-        case unrender (pack v) of
-          Just t -> return (run (unEnvProgramT'Required f t), state)  
-          Nothing -> return (Defeat, state)
-      Nothing -> return (Defeat, state)
-  hoist n (EnvProgramT'Required f) = EnvProgramT'Required (hoist n . f)
-  documentation = [Node
-    ("required env: " <> showSymbol @name <> " :: " <> showTypeRep @t)
-    (documentation @p)]
-
-instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Optional name t & p) where
-  data ProgramT (Env 'Optional name t & p) m a = EnvProgramT'Optional
-    { unEnvProgramT'Optional :: Maybe t -> ProgramT p m a
-    , unEnvDefault :: Maybe t }
-  run f = Action $ \state -> do
-    val <- lookupEnv $ showSymbol @name
-    case val of
-      Just v -> do
-        case unrender @t (pack v) of
-          Just t -> return (run (unEnvProgramT'Optional f (Just t)), state)  
-          Nothing -> return (Defeat, state)
-      Nothing -> return (run (unEnvProgramT'Optional f (unEnvDefault f)), state)
-
-  hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
-  documentation = [Node
-    ("optional env: " <> showSymbol @name <> " :: " <> showTypeRep @t)
-    (documentation @p)]
-
-instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
-  newtype ProgramT (Arg name t & p) m a = ArgProgramT { unArgProgramT :: t -> ProgramT p m a }
-  run f = Action $ return . \case
-    (unrender -> Just x):xs -> (run $ unArgProgramT f x, xs)
-    xs -> (Defeat,xs)
-  hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
-  documentation = [Node
-    ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t)
-    (documentation @p)]
-
-instance (HasProgram x, HasProgram y) => HasProgram (x + y) where
-  data ProgramT (x + y) m a = ProgramT x m a :+: ProgramT y m a
-  run (f :+: g) = run f <|> run g
-  hoist n (f :+: g) = hoist n f :+: hoist n g
-  documentation = documentation @x <> documentation @y
-
-infixr 2 :+:
-
-instance HasProgram Raw where
-  newtype ProgramT Raw m a = RawProgramT { unRawProgramT :: m a }
-  run = liftIO . unRawProgramT
-  hoist n (RawProgramT m) = RawProgramT (n m)
-  documentation = []
-
-
-instance (SymbolList options, KnownSymbol name, HasProgram p, Unrender t) => HasProgram (Opt options name t & p) where
-  data ProgramT (Opt options name t & p) m a = OptProgramT
-    { unOptProgramT :: Maybe t -> ProgramT p m a
-    , unOptDefault :: Maybe t }
-  run f = Action $ return . recurseOpt
-    where
-    recurseOpt = \case
-      d@(x:y:xs)
-        | elem x $ symbolList @options -> case unrender y of
-           Just t -> (, xs) $ run $ unOptProgramT f $ Just t
-           Nothing -> (Defeat,d) 
-      x:xs -> (x :) <$> recurseOpt xs
-      [] -> (,[]) $ run $ unOptProgramT f $ unOptDefault f
-  hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
-  documentation = [Node
-    ("option: " <> intercalate ", " (symbolList @options) <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
-    (documentation @p)]
-
-instance (SymbolList flags, HasProgram p) => HasProgram (Flag flags & p) where
-  newtype ProgramT (Flag flags & p) m a = FlagProgramT { unFlagProgramT :: Bool -> ProgramT p m a }
-  run f = Action $ return . first (run . unFlagProgramT f) . recurseFlag
-    where
-    recurseFlag :: State -> (Bool,State)
-    recurseFlag = \case
-      x:xs | elem x $ symbolList @flags -> (True,xs)
-           | otherwise -> (x :) <$> recurseFlag xs
-      [] -> (False,[])
-  hoist n = FlagProgramT . fmap (hoist n) . unFlagProgramT
-  documentation = [Node
-    ("flag: " <> intercalate ", " (symbolList @flags))
-    (documentation @p)]
-
-instance (KnownSymbol name, HasProgram p) => HasProgram (Named name & p) where
-  newtype ProgramT (Named name & p) m a = NamedProgramT { unNamedProgramT :: ProgramT p m a }
-  run = run . unNamedProgramT 
-  hoist n = NamedProgramT . hoist n . unNamedProgramT
-  documentation = [Node
-    ("name: " <> showSymbol @name)
-    (documentation @p)]
-
-instance (KnownSymbol description, HasProgram p) => HasProgram (Description description & p) where
-  newtype ProgramT (Description description & p) m a = DescriptionProgramT { unDescriptionProgramT :: ProgramT p m a }
-  run = run . unDescriptionProgramT 
-  hoist n = DescriptionProgramT . hoist n . unDescriptionProgramT
-  documentation = [Node
-    ("description: " <> showSymbol @description)
-    []] <> documentation @p
-
-instance (KnownSymbol annotation, HasProgram (combinator & p)) => HasProgram (Annotated annotation combinator & p) where
-  newtype ProgramT (Annotated annotation combinator & p) m a = AnnotatedProgramT { unAnnotatedProgramT :: ProgramT (combinator & p) m a }
-  run = run . unAnnotatedProgramT 
-  hoist n = AnnotatedProgramT . hoist n . unAnnotatedProgramT
-  documentation = fmap (\(Node x s) -> Node (x <> ", " <> showSymbol @annotation) s) (documentation @(combinator & p))
-
-instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
-  newtype ProgramT (sub & p) m a = SubProgramT { unSubProgramT :: ProgramT p m a }
-  run s = Action $ return . \case
-    x:xs | x == showSymbol @sub -> (run $ unSubProgramT s, xs)
-    x -> (Defeat, x)
-  hoist n = SubProgramT . hoist n . unSubProgramT
-  documentation = [Node
-    ("subprogram: " <> showSymbol @sub)
-    (documentation @p)]
-
--- | This is a combinator which runs a 'ProgramT' with the options,
--- arguments, and flags that I get using the 'initialState' function,
--- ignoring the output of the program.
-command_ :: forall p a.
-            HasProgram p 
-         => ProgramT p IO a 
-         -> IO ()
--- command_ prog = void $ initialState >>= runCommanderT (run prog)
-command_ = void . command
-
--- | This is a combinator which runs a 'ProgramT' with the options,
--- arguments, and flags that I get using the 'initialState' function,
--- returning 'Just' the output of the program upon successful option and argument
--- parsing and returning 'Nothing' otherwise.
-command :: forall p a.
-           HasProgram p 
-        => ProgramT p IO a 
-        -> IO (Maybe a)
-command prog = runCommanderT (run prog) . fmap pack =<< getArgs
-
--- | Raw monadic combinator
-raw :: forall m a.
-       m a 
-    -> ProgramT Raw m a
-raw = RawProgramT
-
--- | Argument combinator
-arg :: forall name x p m a.
-       KnownSymbol name
-    => (x -> ProgramT p m a) 
-    -> ProgramT (Arg name x & p) m a 
-arg = ArgProgramT
-
--- | Option combinator
-opt
-  :: forall option name x p m a.
-     (KnownSymbol option, KnownSymbol name)
-  => (Maybe x -> ProgramT p m a) 
-  -> ProgramT (Opt '[option] name x & p) m a
--- opt = flip OptProgramT Nothing
-opt = optMulti
-
--- | Option combinator with multiple option matchs
-optMulti
-  :: forall options name x p m a.
-   (KnownSymbol name)
-  => (Maybe x -> ProgramT p m a) 
-  -> ProgramT (Opt options name x & p) m a
-optMulti = flip OptProgramT Nothing
-
--- | Option combinator with a default value
-optDef
-  :: forall option name x p m a.
-     (KnownSymbol option, KnownSymbol name)
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Opt '[option] name x & p) m a
-optDef = optDefMulti
-
--- | Option combinator with a default value that has multiple option matchs
-optDefMulti
-  :: forall options name x p m a.
-     (SymbolList options, KnownSymbol name)
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Opt options name x & p) m a
-optDefMulti x f = OptProgramT
-  { unOptDefault = Just x
-  , unOptProgramT = \case
-    Just x -> f x
-    Nothing -> error "Violated invariant of optDef"
-  }
-
--- | Boolean flag combinator
-flag :: forall flag p m a.
-        KnownSymbol flag 
-     => (Bool -> ProgramT p m a) 
-     -> ProgramT (Flag '[flag] & p) m a
-flag = FlagProgramT
-
--- | Boolean flag combinator
-flagMulti
-  :: forall flags p m a.
-     SymbolList flags 
-  => (Bool -> ProgramT p m a) 
-  -> ProgramT (Flag flags & p) m a
-flagMulti = FlagProgramT
-
--- | Required environment variable combinator
-env :: forall name p x m a.
-     KnownSymbol name
-  => (x -> ProgramT p m a)
-  -> ProgramT (Env 'Required name x & p) m a
-env = EnvProgramT'Required
-
--- | Optional environment variable combinator
-envOpt :: forall name x p m a.
-     KnownSymbol name
-  => (Maybe x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional name x & p) m a
-envOpt = flip EnvProgramT'Optional Nothing
-
--- | Optional environment variable combinator with default
-envOptDef :: forall name x p m a.
-     KnownSymbol name
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional name x & p) m a
-envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Optional = \case { Just x -> f x; Nothing -> error "Violated invariant of optEnvDef" } }
-
--- | Subcommand combinator
-sub :: forall s p m a.
-       KnownSymbol s 
-    => ProgramT p m a 
-    -> ProgramT (s & p) m a
-sub = SubProgramT
-
--- | Named command combinator, useful at the top level for naming
--- a program. Typically, the name will be the name or alias of the
--- executable you expect to produce.
-named :: forall s p m a.
-         KnownSymbol s 
-      => ProgramT p m a 
-      -> ProgramT (Named s & p) m a
-named = NamedProgramT
 
 -- | A convenience combinator that constructs the program I often want
 -- to run out of a program I want to write.
 toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m () 
-         -> ProgramT (Named s & ("help" & Raw + p)) m ()
-toplevel p = named (sub (usage @(Named s & ("help" & Raw + p))) <+> p)
-
--- | The command line program which consists of trying to enter one and
--- then trying the other.
-(<+>) :: forall x y m a. ProgramT x m a -> ProgramT y m a -> ProgramT (x + y) m a
-(<+>) = (:+:)
-
-infixr 2 <+>
+         -> ProgramT (Named s & (Sub "help" & Raw + p)) m ()
+-- toplevel p = named (sub (usage @(Named s & ("help" & Raw + p))) <+> p)
+toplevel p = named (sub (usage @(Named s & (Sub "help" & Raw + p))) <+> p)
 
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.
@@ -542,74 +149,3 @@ usage = raw $ do
   liftIO $ putStrLn "usage:"
   liftIO $ putStrLn (document @p)
 
--- | A combinator which augments the documentation of the next element, by
--- adding a description after its name and type.
-annotated :: forall annotation combinator p m a. ProgramT (combinator & p) m a -> ProgramT (Annotated annotation combinator & p) m a
-annotated = AnnotatedProgramT
-
--- | A combinator which takes a program, and a type-level 'Symbol'
--- description of that program, and produces a program here the
--- documentation is annotated with the given description.
-description :: forall description p m a. (HasProgram p, KnownSymbol description) => ProgramT p m a -> ProgramT (Description description & p) m a
-description = DescriptionProgramT
-
--- | The type of middleware, which can transform interpreted command line programs
--- by meddling with arguments, options, or flags, or by adding effects for
--- every step. You can also change the underlying monad.
-type Middleware m n = forall a. CommanderT State m a -> CommanderT State n a
-
--- | Middleware to transform the base monad with a natural transformation.
-transform :: (Monad m, Monad n) => (forall a. m a -> n a) -> Middleware m n
-transform f commander = case commander of
-  Action a -> Action $ \state -> do
-    (commander', state') <- f (a state)
-    pure (transform f commander', state')
-  Defeat -> Defeat
-  Victory a -> Victory a 
-
--- | Middleware to add monadic effects for every 'Action'. Useful for
--- debugging complex command line programs.
-withActionEffects :: Monad m => m a -> Middleware m m
-withActionEffects ma = transform (ma *>)
-
--- | Middleware to have effects whenever the program might backtrack.
-withDefeatEffects :: Monad m => m a -> Middleware m m
-withDefeatEffects ma commander = case commander of
-  Action a -> Action $ \state -> do
-    (commander', state') <- a state
-    pure (withDefeatEffects ma commander', state')
-  Defeat -> Action $ \state -> ma $> (Defeat, state)
-  Victory a -> Victory a
-
--- | Middleware to have effects whenever the program successfully computes
--- a result.
-withVictoryEffects :: Monad m => m a -> Middleware m m
-withVictoryEffects ma commander = case commander of
-  Action a -> Action $ \state -> do
-    (commander', state') <- a state
-    pure (withVictoryEffects ma commander', state')
-  Defeat -> Defeat
-  Victory a -> Action $ \state -> ma $> (Victory a, state)
-
--- | Produce a 2-dimensional textual drawing of the 'Tree' description of
--- this program.
-document :: forall p. HasProgram p => String
-document = drawForest (documentation @p)
-
--- | Middleware to log the state to standard out for every step of the
--- 'CommanderT' computation.
-logState :: MonadIO m => Middleware m m
-logState commander
-  = case commander of
-      Action a ->
-        Action $ \state -> do
-          liftIO $ print state
-          fmap (first logState) (a state)
-      Defeat ->
-        Action $ \state -> do
-          liftIO $ print state
-          pure (Defeat, state)
-      Victory a ->
-        Action $ \state -> do
-          liftIO $ print state
-          pure (Victory a, state)

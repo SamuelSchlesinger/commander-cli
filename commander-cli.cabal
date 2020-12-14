@@ -21,7 +21,22 @@ source-repository head
 
 library
   exposed-modules:     Options.Commander,
-                       Options.Commander.Internal
+                       Options.Commander.Annotated,
+                       Options.Commander.Argument,
+                       Options.Commander.Combine,
+                       Options.Commander.Description,
+                       Options.Commander.Environment,
+                       Options.Commander.Flag,
+                       Options.Commander.Program,
+                       Options.Commander.Internal,
+                       Options.Commander.Imports,
+                       Options.Commander.Middleware,
+                       Options.Commander.Named,
+                       Options.Commander.Option,
+                       Options.Commander.Raw,
+                       Options.Commander.Sequence,
+                       Options.Commander.Subcommand,
+                       Options.Commander.Unrender
   default-extensions:  AllowAmbiguousTypes,
                        ViewPatterns,
                        BlockArguments,
@@ -38,6 +53,7 @@ library
                        RecordWildCards,
                        ScopedTypeVariables,
                        StandaloneDeriving,
+                       TupleSections,
                        TypeApplications,
                        TypeFamilies,
                        TypeOperators,
@@ -49,12 +65,13 @@ library
                        unordered-containers >=0.2 && < 1,
                        commandert >=0.1,
                        containers >=0.1
-  -- ghc-options:         -Wall -Werror
+  ghc-options:         -Wall -Werror
   hs-source-dirs:      src
   default-language:    Haskell2010
 
 executable task-manager
   main-is:             Main.hs
+  hs-source-dirs:      app
   other-modules:       Task,
                        Task.CLI,
                        Task.Codec,
@@ -77,12 +94,22 @@ executable task-manager
                        process >= 1.6 && < 2,
                        commandert >=0.1,
                        commander-cli
-  hs-source-dirs:      app
+  ghc-options:         -Wall -Werror
   default-language:    Haskell2010
 
 test-suite test-commander
   type:                exitcode-stdio-1.0
-  main-is:             Test.hs
+  main-is:             Spec.hs
+  hs-source-dirs:      test
+  other-modules:       Options.Commander.ArgumentSpec,
+                       Options.Commander.EitherSpec,
+                       Options.Commander.EnvironmentSpec,
+                       Options.Commander.FlagSpec,
+                       Options.Commander.OptionSpec,
+                       Options.Commander.RawSpec,
+                       Options.Commander.SubcommandSpec,
+                       Options.CommanderSpec
+                       Test
   default-extensions:  BlockArguments,
                        DataKinds,
                        LambdaCase,
@@ -95,5 +122,8 @@ test-suite test-commander
                        unordered-containers >= 0.2 && < 1,
                        commandert >=0.1,
                        commander-cli,
-                       hspec ^>= 2.7.4
+                       hspec ^>= 2.7.4,
+                       hspec-discover ^>= 2.7.4
+  ghc-options:         -Wall -Werror -fprint-potential-instances -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
+
