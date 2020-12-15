@@ -13,9 +13,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t 
     (unrender -> Just x):xs -> (run $ unArgProgramT f x, xs)
     xs -> (Defeat,xs)
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
-  documentation = [Node
-    ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t)
-    (documentation @p)]
+  documentation = pure . Node ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t) . documentation . unArgProgramT
 
 -- | Argument combinator
 arg :: forall name x p m a.

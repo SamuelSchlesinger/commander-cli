@@ -10,7 +10,10 @@ instance (KnownSymbol annotation, HasProgram (combinator & p)) => HasProgram (An
   newtype ProgramT (Annotated annotation combinator & p) m a = AnnotatedProgramT { unAnnotatedProgramT :: ProgramT (combinator & p) m a }
   run = run . unAnnotatedProgramT 
   hoist n = AnnotatedProgramT . hoist n . unAnnotatedProgramT
-  documentation = fmap (\(Node x s) -> Node (x <> ", " <> showSymbol @annotation) s) (documentation @(combinator & p))
+  documentation
+    = fmap (\(Node x s) -> Node (x <> ", " <> showSymbol @annotation) s)
+    . documentation
+    . unAnnotatedProgramT
 
 -- | A combinator which augments the documentation of the next element, by
 -- adding a description after its name and type.

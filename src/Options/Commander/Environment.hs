@@ -14,7 +14,10 @@ data Env :: Optionality -> [Symbol] -> * -> *
 data Optionality = Required | Optional
 
 instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Required names t & p) where
-  newtype ProgramT (Env 'Required names t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
+  data ProgramT (Env 'Required names t & p) m a = EnvProgramT'Required
+    { unEnvProgramT'Required :: t -> ProgramT p m a
+    , unEnvProgramTDocumentation'Required :: ProgramT p m a
+    }
   run f = Action $ \state -> do
     val <- altMay (fmap (>>= unrender . pack) . lookupEnv) $ symbolList @names -- this may not fit into the design where unrender failurs use alternative and not just defeated at a unrender failure
     return . (, state) $ case val of
@@ -25,8 +28,7 @@ instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Requir
     = pure
     . Node ("required env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
     . documentation
-    . 
-    . unEnvProgramT'Required
+    . unEnvProgramTDocumentation'Required
 
 instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Optional names t & p) where
   data ProgramT (Env 'Optional names t & p) m a = EnvProgramT'Optional

@@ -8,7 +8,7 @@ import Options.Commander.Imports
 -- documentation purposes.
 data Opt :: [Symbol] -> Symbol -> * -> *
 
-instance (SymbolList options, KnownSymbol name, HasProgram p, Unrender t) => HasProgram (Opt options name t & p) where
+instance (SymbolList options, KnownSymbol name, HasProgram p, Render t, Unrender t) => HasProgram (Opt options name t & p) where
   data ProgramT (Opt options name t & p) m a = OptProgramT
     { unOptProgramT :: Maybe t -> ProgramT p m a
     , unOptDefault :: Maybe t }
@@ -22,9 +22,10 @@ instance (SymbolList options, KnownSymbol name, HasProgram p, Unrender t) => Has
       x:xs -> (x:) <$> recurseOpt xs
       [] -> (,[]) $ run $ unOptProgramT f $ unOptDefault f
   hoist n (OptProgramT f d) = OptProgramT (hoist n . f) d
-  documentation = [Node
-    ("option: " <> intercalate ", " (symbolList @options) <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> ">")
-    (documentation @p)]
+  documentation f = pure $ Node doc $ documentation $ unOptProgramT f $ unOptDefault f
+    where
+    doc = "option: " <> intercalate ", " (symbolList @options) <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> docDefault <> ">"
+    docDefault = fromMaybe "" $ (" default val \"" <>) <$> render <$> unOptDefault f <&> (<> "\"")
 
 -- | Option combinator
 opt

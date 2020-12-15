@@ -11,9 +11,7 @@ instance (KnownSymbol description, HasProgram p) => HasProgram (Description desc
   newtype ProgramT (Description description & p) m a = DescriptionProgramT { unDescriptionProgramT :: ProgramT p m a }
   run = run . unDescriptionProgramT 
   hoist n = DescriptionProgramT . hoist n . unDescriptionProgramT
-  documentation = [Node
-    ("description: " <> showSymbol @description)
-    []] <> documentation @p
+  documentation = pure . Node ("description: " <> showSymbol @description) . documentation . unDescriptionProgramT
 
 -- | A combinator which takes a program, and a type-level 'Symbol'
 -- description of that program, and produces a program here the

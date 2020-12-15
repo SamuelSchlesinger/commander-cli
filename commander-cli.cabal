@@ -34,6 +34,7 @@ library
                        Options.Commander.Named,
                        Options.Commander.Option,
                        Options.Commander.Raw,
+                       Options.Commander.Render,
                        Options.Commander.Sequence,
                        Options.Commander.Subcommand,
                        Options.Commander.Unrender
