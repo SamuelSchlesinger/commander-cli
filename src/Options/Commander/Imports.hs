@@ -9,6 +9,8 @@ module Options.Commander.Imports
 
   , module Data.Function
   , module Data.Functor
+  , module Data.Maybe
+  , module Type.Reflection
   ) where
 
 import Control.Monad.Commander
@@ -21,4 +23,6 @@ import Options.Commander.Unrender
 
 import Data.Function
 import Data.Functor
+import Data.Maybe hiding (catMaybes)
+import Type.Reflection
 

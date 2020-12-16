@@ -27,10 +27,16 @@ spec = do
     testProgram "missing  option"       program (Just Nothing        :: Maybe (Maybe String)) ["abc"]
 
   describe "optDef" do
-    let program :: ProgramT (Opt '["o"] "opt" ('Just "Default") String & Raw) IO String
-        program = optDef \o -> raw $ pure o
-    testProgram "default option"  program (Just "Default") []
-    testProgram "option provided" program (Just "hello")   ["o","hello"]
+    describe "String type" do
+      let program :: ProgramT (Opt '["o"] "opt" ('Just "Default") String & Raw) IO String
+          program = $(optDef @String "o" "opt" "Default") \o -> raw $ pure o
+      testProgram "default option"  program (Just "Default") []
+      testProgram "option provided" program (Just "hello")   ["o","hello"]
+
+    describe "Int type without signiture" do
+      let program = $(optDef @Int "o" "opt" "2") \o -> raw $ pure o
+      testProgram "default option"  program (Just 2) []
+      testProgram "option provided" program (Just 4)   ["o","4"]
 
   describe "optDefMulti" do
     let program :: forall def a. ProgramT (Opt '["o","another"] "opt" ('Just def) a & Raw) IO a
