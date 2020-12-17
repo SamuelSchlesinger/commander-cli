@@ -1,5 +1,12 @@
-module Options.Commander.Option where
+module Options.Commander.Option
+  ( Opt
+  , opt
+  , optMulti
+  , optDef
+  , optDefMulti
+  ) where
 
+import Data.List.NonEmpty
 import Control.Monad (when)
 import Options.Commander.Imports
 import Data.String (IsString(fromString))
@@ -55,30 +62,23 @@ optDef
   :: forall t.
      Unrender t
   => String -> String -> String -> ExpQ
-optDef option name def = do
-  when (isNothing $ unrender @t $ fromString def) $ fail $ "Unrender faild for type \"" <> showTypeRep @t <> "\" on the default value \"" <> def <> "\"."
-  [e| OptProgramT . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(t) -> ProgramT p m a) -> ProgramT (Opt '[$(toType option)] $(toType name) ('Just $(toType def)) $(t) & p) m a |]
-  where
-  toType :: String -> TypeQ
-  toType = litT . strTyLit
-  t :: TypeQ
-  t = fromTypeable @t
-  fromTypeable :: forall a . Typeable a => TypeQ
-  fromTypeable = fromTypeRep $ typeRep @a
-  fromTypeRep :: forall a. TypeRep a -> TypeQ
-  fromTypeRep = splitApps >>> \(x,xs) -> foldl appT(fromTypeCon x) $ fmap (fromTypeCon . someTypeRepTyCon) xs
-  fromTypeCon :: TyCon -> TypeQ
-  fromTypeCon = conT . mkName . tyConName
-
-  -- typeRepType :: forall a. Typeable a => TypeQ
-  -- typeRepType = conT $ mkName $ "Show" -- showTypeRep @a
-  -- t = typeRepType @t
+optDef = optDefMulti @t . pure
 
 -- | Option combinator with a default value that has multiple option matchs
 optDefMulti
-  :: forall options name def x p m a.
-     (SymbolList options, KnownSymbol name)
-  => (x -> ProgramT p m a)
-  -> ProgramT (Opt options name ('Just def) x & p) m a
-optDefMulti f = OptProgramT $ maybe (error "Violated invariant of optDef") f
+  :: forall t.
+     Unrender t
+  => NonEmpty String -> String -> String -> ExpQ
+optDefMulti options name def = do
+  when (isNothing $ unrender @t $ fromString def) $ fail $ "Unrender faild for type \"" <> showTypeRep @t <> "\" on the default value \"" <> def <> "\"."
+  os' <- os
+  runIO $ putStrLn "os: " *> print os'
+  [e| OptProgramT . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(t) -> ProgramT p m a) -> ProgramT (Opt $(os) $(symbolType name) ('Just $(symbolType def)) $(t) & p) m a |]
+  where
+  t :: TypeQ
+  t = fromTypeable @t
+  os :: TypeQ
+  os = promoted $ fmap symbolType options
+  promoted :: Foldable f => f TypeQ -> TypeQ
+  promoted = foldr (\x y -> promotedConsT `appT` x `appT` y) [t|('[] :: [Symbol])|]
 

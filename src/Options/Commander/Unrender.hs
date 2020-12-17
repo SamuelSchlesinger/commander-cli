@@ -2,7 +2,7 @@ module Options.Commander.Unrender where
 
 import Data.Word
 import Numeric.Natural
-import Data.Typeable (Typeable)
+import Type.Reflection (Typeable)
 import Data.Int
 import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Char8 as BS8

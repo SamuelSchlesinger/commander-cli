@@ -115,6 +115,7 @@ test-suite test-commander
                        Test
   default-extensions:  BlockArguments,
                        DataKinds,
+                       KindSignatures,
                        LambdaCase,
                        OverloadedStrings,
                        TemplateHaskell,
