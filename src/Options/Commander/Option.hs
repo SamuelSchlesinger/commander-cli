@@ -6,22 +6,15 @@ module Options.Commander.Option
   , optDefMulti
   ) where
 
-import Data.List.NonEmpty
-import Control.Monad (when)
+import Data.List.NonEmpty (NonEmpty)
 import Options.Commander.Imports
-import Data.String (IsString(fromString))
-import Language.Haskell.TH
--- import Language.Haskell.TH.Lib
+import Language.Haskell.TH (ExpQ, TypeQ, stringE)
 
 
 -- | The type level 'opt'ion combinator, with a 'Symbol' designating the
 -- option's name and another representing the metavariables name for
 -- documentation purposes.
 data Opt :: [Symbol] -> Symbol -> Maybe Symbol -> * -> *
-
-class MaybeSymbol a where maybeSymbol :: IsString b => Maybe b
-instance KnownSymbol a => MaybeSymbol ('Just a) where maybeSymbol = Just $ showSymbol @a
-instance MaybeSymbol 'Nothing where maybeSymbol = Nothing
 
 instance (SymbolList options, KnownSymbol name, MaybeSymbol def, HasProgram p, Unrender t) => HasProgram (Opt options name def t & p) where
   newtype ProgramT (Opt options name def t & p) m a = OptProgramT {unOptProgramT :: Maybe t -> ProgramT p m a}
@@ -38,8 +31,7 @@ instance (SymbolList options, KnownSymbol name, MaybeSymbol def, HasProgram p, U
   documentation = [Node
     ("option: " <> intercalate ", " (symbolList @options) <> " <" <> showSymbol @name <> " :: " <> showTypeRep @t <> defaultValDoc <> ">")
     (documentation @p)]
-    where
-    defaultValDoc = fromMaybe "" $ (" :: default of \"" <>) <$> maybeSymbol @def <&> (<> "\"")
+    where defaultValDoc = fromMaybe "" $ (" :: default of \"" <>) <$> maybeSymbol @def <&> (<> "\"")
 
 -- | Option combinator
 opt
@@ -70,15 +62,11 @@ optDefMulti
      Unrender t
   => NonEmpty String -> String -> String -> ExpQ
 optDefMulti options name def = do
-  when (isNothing $ unrender @t $ fromString def) $ fail $ "Unrender faild for type \"" <> showTypeRep @t <> "\" on the default value \"" <> def <> "\"."
-  os' <- os
-  runIO $ putStrLn "os: " *> print os'
+  checkUnrender @t def
   [e| OptProgramT . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(t) -> ProgramT p m a) -> ProgramT (Opt $(os) $(symbolType name) ('Just $(symbolType def)) $(t) & p) m a |]
   where
   t :: TypeQ
   t = fromTypeable @t
   os :: TypeQ
-  os = promoted $ fmap symbolType options
-  promoted :: Foldable f => f TypeQ -> TypeQ
-  promoted = foldr (\x y -> promotedConsT `appT` x `appT` y) [t|('[] :: [Symbol])|]
+  os = promotedSymbolList $ fmap symbolType options
 

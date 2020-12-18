@@ -2,6 +2,7 @@ module Options.Commander.EnvironmentSpec where
 
 import Test
 import System.Environment (setEnv)
+import Data.List.NonEmpty (NonEmpty((:|)))
 
 
 spec :: Spec
@@ -27,7 +28,7 @@ spec = do
     test (Just 6      :: Maybe Int)
 
   it "envOpt" do
-    let program :: forall a. ProgramT (Env 'Optional '["BIGNAME"] a & Raw) IO (Maybe a)
+    let program :: forall a. ProgramT (Env ('Optional 'Nothing) '["BIGNAME"] a & Raw) IO (Maybe a)
         program = envOpt \e -> raw $ pure e
     let test result = runCommanderT (run $ program) [] >>= (`shouldBe` result)
     test $ Just $ (Nothing    :: Maybe String)
@@ -37,7 +38,7 @@ spec = do
     test $ Just $ (Just 3     :: Maybe Int)
 
   describe "envOptMulti" do
-    let program :: forall a. ProgramT (Env 'Optional '["EOM","EOM1"] a & Raw) IO (Maybe a)
+    let program :: forall a. ProgramT (Env ('Optional 'Nothing) '["EOM","EOM1"] a & Raw) IO (Maybe a)
         program = envOptMulti \e -> raw $ pure e
     let test result = runCommanderT (run $ program) [] >>= (`shouldBe` result)
 
@@ -60,23 +61,23 @@ spec = do
       setEnv "EOM1" "def"
       test $ (Nothing :: Maybe (Maybe Int))
 
-  it "envOptDef" do
-    let program :: a -> ProgramT (Env 'Optional '["CORPUS"] a & Raw) IO a
-        program x = envOptDef x \e -> raw $ pure e
-    let test defaultVal result = runCommanderT (run $ program defaultVal) [] >>= (`shouldBe` result)
-    test (1      :: Int)    $ Just 1
-    setEnv "CORPUS" "2"
-    test (1      :: Int)    $ Just 2
-    setEnv "CORPUS" "POOP"
-    test ("POOP" :: String) $ Just "POOP"
+  describe "envOptDefMulti" do
+    it "Int" do
+      let program :: ProgramT (Env ('Optional ('Just "1")) '["ENVOPTDEFMULTI","ENVOPTDEFMULTI2"] Int & Raw) IO Int
+          program = $(envOptDefMulti @Int ("ENVOPTDEFMULTI" :| ["ENVOPTDEFMULTI2"]) "1") \e -> raw $ pure e
+      let test result = runCommanderT (run program) [] >>= (`shouldBe` result)
+      test $ Just 1
+      setEnv "ENVOPTDEFMULTI2" "2"
+      test $ Just 2
+      setEnv "ENVOPTDEFMULTI" "3"
+      test $ Just 3
 
-  it "envOptDefMulti" do
-    let program :: a -> ProgramT (Env 'Optional '["ENVOPTDEFMULTI","ENVOPTDEFMULTI2"] a & Raw) IO a
-        program x = envOptDefMulti x \e -> raw $ pure e
-    let test defaultVal result = runCommanderT (run $ program defaultVal) [] >>= (`shouldBe` result)
-    test (1      :: Int)    $ Just 1
-    setEnv "ENVOPTDEFMULTI2" "2"
-    test (1      :: Int)    $ Just 2
-    setEnv "ENVOPTDEFMULTI" "POOP"
-    test ("POOP" :: String) $ Just "POOP"
+    -- it "without type definition" do
+    --   let program = $(envOptDefMulti @String ("ENVOPTDEFMULTIWITHOUT" :| ["ENVOPTDEFMULTIWITHOUT2"]) "ABC") \e -> raw $ pure e
+    --   let test result = runCommanderT (run program) [] >>= (`shouldBe` result)
+    --   test $ Just "ABC"
+    --   setEnv "ENVOPTDEFMULTIWITHOUT2" "DEF"
+    --   test $ Just "DEF"
+    --   setEnv "ENVOPTDEFMULTIWITHOUT" "GHI"
+    --   test $ Just "GHI"
 

@@ -12,7 +12,7 @@ import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Data.List.NonEmpty (NonEmpty, cons)
 import Data.Foldable (toList)
 import qualified Data.Maybe
-import Language.Haskell.TH (TypeQ, conT, mkName, appT, litT, strTyLit)
+import Language.Haskell.TH (TypeQ, conT, mkName, appT, litT, strTyLit, promotedConsT)
 
 
 showSymbol :: forall (a :: Symbol) b. (KnownSymbol a, IsString b) => b
@@ -62,4 +62,11 @@ infixr 8 >>>
 
 catMaybes :: Foldable f => f (Maybe a) -> [a]
 catMaybes = Data.Maybe.catMaybes . toList
+
+promotedSymbolList :: Foldable f => f TypeQ -> TypeQ
+promotedSymbolList = foldr (\x y -> promotedConsT `appT` x `appT` y) [t|('[] :: [Symbol])|]
+
+class MaybeSymbol a where maybeSymbol :: IsString b => Maybe b
+instance KnownSymbol a => MaybeSymbol ('Just a) where maybeSymbol = Just $ showSymbol @a
+instance MaybeSymbol 'Nothing where maybeSymbol = Nothing
 
