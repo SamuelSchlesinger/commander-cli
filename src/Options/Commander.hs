@@ -157,6 +157,7 @@ import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Commander
 import Data.Tree
+import System.Exit (exitFailure)
 
 -- | A class for interpreting command line arguments into Haskell types.
 class Typeable t => Unrender t where
@@ -528,8 +529,17 @@ flag = FlagProgramT
 -- to run out of a program I want to write.
 toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m () 
-         -> ProgramT (Named s & ("help" & Raw + p)) m ()
-toplevel p = named (sub (usage @(Named s & ("help" & Raw + p))) <+> p)
+         -> ProgramT (Named s & ("help" & Raw + p + Raw)) m ()
+-- toplevel p = named (sub (usage @(Named s & ("help" & Raw + p))) <+> p)
+toplevel p = named $ helpSubprogram <+> p <+> helpIfMissed
+  where
+  helpSubprogram = sub $ usage @(Named s & ("help" & Raw + p))
+  helpIfMissed :: ProgramT Raw m ()
+  helpIfMissed = raw $ liftIO do
+    putStrLn "usage:"
+    putStrLn (document @p)
+    exitFailure
+  
 
 -- | The command line program which consists of trying to enter one and
 -- then trying the other.
