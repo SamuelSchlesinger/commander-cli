@@ -331,6 +331,7 @@ instances. Of course, you can if you want to, and it can be profitable to do so.
 - [hflags](https://hackage.haskell.org/package/hflags) Command line flag parser, very similar to Google's gflags
 - [multiarg](https://hackage.haskell.org/package/multiarg) Command lines for options that take multiple arguments
 - [options](https://hackage.haskell.org/package/options) A powerful and easy-to-use command-line option parser.
+- [optparse-applicative](https://hackage.haskell.org/package/optparse-applicative) Utilities and combinators for parsing command line options
 - [parseargs](https://hackage.haskell.org/package/parseargs) Parse command-line arguments
 - [shell-utility](https://hackage.haskell.org/package/shell-utility) Utility functions for writing command-line programs
 - [symantic-cli](https://hackage.haskell.org/package/symantic-cli) Symantics for parsing and documenting a CLI
