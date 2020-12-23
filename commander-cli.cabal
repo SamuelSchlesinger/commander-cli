@@ -23,6 +23,8 @@ library
   exposed-modules:     Options.Commander,
                        Options.Commander.Annotated,
                        Options.Commander.Argument,
+                       Options.Commander.Arguments,
+                       Options.Commander.Arguments.NonEmpty,
                        Options.Commander.Combine,
                        Options.Commander.Description,
                        Options.Commander.Environment,
@@ -44,6 +46,7 @@ library
                        DeriveGeneric,
                        DerivingVia,
                        FlexibleInstances,
+                       FlexibleContexts,
                        GADTs,
                        GeneralizedNewtypeDeriving,
                        LambdaCase,
@@ -61,6 +64,7 @@ library
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
+                       transformers ^>= 0.5.6.2,
                        text >=1.2 && <2,
                        unordered-containers >=0.2 && < 1,
                        commandert >=0.1,
@@ -102,6 +106,8 @@ test-suite test-commander
   main-is:             Spec.hs
   hs-source-dirs:      test
   other-modules:       Options.Commander.ArgumentSpec,
+                       Options.Commander.ArgumentsSpec,
+                       Options.Commander.Arguments.NonEmptySpec,
                        Options.Commander.EitherSpec,
                        Options.Commander.EnvironmentSpec,
                        Options.Commander.FlagSpec,
@@ -112,6 +118,7 @@ test-suite test-commander
                        Test
   default-extensions:  BlockArguments,
                        DataKinds,
+                       GADTs,
                        LambdaCase,
                        OverloadedStrings,
                        TypeApplications,
