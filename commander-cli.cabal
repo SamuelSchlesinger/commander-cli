@@ -24,7 +24,7 @@ library
                        Options.Commander.Annotated,
                        Options.Commander.Argument,
                        Options.Commander.Arguments,
-                       Options.Commander.Arguments.NonEmpty,
+                       Options.Commander.Arguments.AtLeast,
                        Options.Commander.Combine,
                        Options.Commander.Description,
                        Options.Commander.Environment,
@@ -107,7 +107,7 @@ test-suite test-commander
   hs-source-dirs:      test
   other-modules:       Options.Commander.ArgumentSpec,
                        Options.Commander.ArgumentsSpec,
-                       Options.Commander.Arguments.NonEmptySpec,
+                       Options.Commander.Arguments.AtLeastSpec,
                        Options.Commander.EitherSpec,
                        Options.Commander.EnvironmentSpec,
                        Options.Commander.FlagSpec,

@@ -2,10 +2,10 @@ module Options.Commander.Arguments
   ( Args
   , ProgramT(ArgsProgramT)
   , args
-  , module Options.Commander.Arguments.NonEmpty
+  , module Options.Commander.Arguments.AtLeast
   ) where
 
-import Options.Commander.Arguments.NonEmpty
+import Options.Commander.Arguments.AtLeast
 import Control.Monad ((>=>))
 import Control.Monad.State (StateT(runStateT), lift, mapStateT, get, put)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT,runMaybeT), mapMaybeT)
@@ -19,8 +19,8 @@ data Args :: Symbol -> * -> *
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Args name (f t) & p) where
   data ProgramT (Args name (f t) & p) m a = ArgsProgramT
-    { unArgsProgramT :: Actual f t -> ProgramT p m a
-    , unArgsConsume :: StateT State (MaybeT m) (Actual f t)
+    { unArgsProgramT :: f t -> ProgramT p m a
+    , unArgsConsume :: StateT State (MaybeT m) (f t)
     }
   run f = Action $ unLift $ unArgsConsume f
     where
@@ -41,8 +41,8 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Args name (
 -- | Arguments combinator that consumes the rest of the arguments with at least n values
 args
   :: forall name f t p m a
-   . (Unrender t, Monad m, FromList (Actual f))
-  => (Actual f t -> ProgramT p m a)
+   . (Unrender t, Monad m, FromList f)
+  => (f t -> ProgramT p m a)
   -> ProgramT (Args name (f t) & p) m a
 args unArgsProgramT = ArgsProgramT
   { unArgsConsume = consumeAll

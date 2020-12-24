@@ -70,6 +70,7 @@ module Options.Commander (
   , module  Options.Commander.Annotated
   , module  Options.Commander.Argument
   , module  Options.Commander.Arguments
+  , module  Options.Commander.Arguments.AtLeast
   , module  Options.Commander.Combine
   , module  Options.Commander.Description
   , module  Options.Commander.Environment
@@ -119,6 +120,7 @@ import Control.Monad.Commander
 import Options.Commander.Annotated
 import Options.Commander.Argument
 import Options.Commander.Arguments
+import Options.Commander.Arguments.AtLeast
 import Options.Commander.Combine
 import Options.Commander.Description
 import Options.Commander.Environment
