@@ -12,7 +12,7 @@ module Options.Commander.Imports
 import Control.Monad.Commander
 import Data.Proxy
 import Data.Tree (Tree(Node), Forest)
-import GHC.TypeLits (Symbol, KnownSymbol)
+import GHC.TypeLits (Symbol, KnownSymbol, KnownNat, natVal)
 import Options.Commander.Internal
 import Options.Commander.Program (HasProgram(ProgramT,run,hoist,documentation), State)
 import Options.Commander.Sequence

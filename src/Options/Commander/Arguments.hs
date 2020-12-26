@@ -2,6 +2,8 @@ module Options.Commander.Arguments
   ( Args
   , ProgramT(ArgsProgramT)
   , args
+  , argsN
+  , argsButN
   , module Options.Commander.Arguments.AtLeast
   ) where
 
@@ -44,20 +46,38 @@ args
    . (Unrender t, Monad m, FromList f)
   => (f t -> ProgramT p m a)
   -> ProgramT (Args name (f t) & p) m a
-args unArgsProgramT = ArgsProgramT
-  { unArgsConsume = consumeAll
-  , ..
-  }
+args unArgsProgramT = ArgsProgramT {..}
+  where unArgsConsume = (get >>= lift . MaybeT . pure . (traverse unrender >=> fromList)) <* put mempty
 
-consumeAll :: forall f t m. (Unrender t, Monad m, FromList f) => StateT State (MaybeT m) (f t)
-consumeAll = (get >>= lift . MaybeT . pure . (traverse unrender >=> fromList)) <* put mempty
+-- | Arguments combinator that consumes n arguments
+argsN
+  :: forall name n t p m a
+   . (KnownNat n, Unrender t, FromList (Exact n), Traversable (Exact n), Monad m)
+  => (Exact n t -> ProgramT p m a)
+  -> ProgramT (Args name (Exact n t) & p) m a
+argsN unArgsProgramT = ArgsProgramT {..}
+  where
+  unArgsConsume = do
+    s <- get
+    let (xs,s') = splitAt i s
+    ys <- lift $ MaybeT $ pure $ traverse unrender =<< fromList xs
+    put s'
+    pure ys
+  i = fromInteger $ natVal $ Proxy @n
 
--- -- | Arguments combinator that consumes all but the last n arguments
--- argsAllBut
---   :: 
--- 
--- args1AllBut
---   ::
--- 
--- consumeAllBut :: forall t m. (Unrender t, Monad m) => StateT State (MaybeT m) [t]
+-- | Arguments combinator that consumes all but the last n arguments
+argsButN
+  :: forall name n f t p m a
+   . (KnownNat n, Monad m, FromList f, Traversable f, Unrender t)
+  => (f t -> ProgramT p m a)
+  -> ProgramT (Args name (f t) & p) m a
+argsButN unArgsProgramT = ArgsProgramT {..}
+  where
+  unArgsConsume = do
+    s <- get
+    let (xs,s') = splitAt i s
+    ys <- lift $ MaybeT $ pure $ traverse unrender =<< fromList xs
+    put s'
+    pure ys
+  i = fromInteger $ natVal $ Proxy @n
 
