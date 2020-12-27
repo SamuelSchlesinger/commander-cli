@@ -72,12 +72,12 @@ spec = do
       setEnv "ENVOPTDEFMULTI" "3"
       test $ Just 3
 
-    -- it "without type definition" do
-    --   let program = $(envOptDefMulti @String ("ENVOPTDEFMULTIWITHOUT" :| ["ENVOPTDEFMULTIWITHOUT2"]) "ABC") \e -> raw $ pure e
-    --   let test result = runCommanderT (run program) [] >>= (`shouldBe` result)
-    --   test $ Just "ABC"
-    --   setEnv "ENVOPTDEFMULTIWITHOUT2" "DEF"
-    --   test $ Just "DEF"
-    --   setEnv "ENVOPTDEFMULTIWITHOUT" "GHI"
-    --   test $ Just "GHI"
+    it "without type definition" do
+      let program = $(envOptDefMulti @String ("ENVOPTDEFMULTIWITHOUT" :| ["ENVOPTDEFMULTIWITHOUT2"]) "ABC") \e -> raw $ pure e
+      let test result = runCommanderT (run program) [] >>= (`shouldBe` result)
+      test $ Just "ABC"
+      setEnv "ENVOPTDEFMULTIWITHOUT2" "DEF"
+      test $ Just "DEF"
+      setEnv "ENVOPTDEFMULTIWITHOUT" "GHI"
+      test $ Just "GHI"
 
