@@ -8,7 +8,7 @@ spec :: Spec
 spec = do
   describe "args" do
     it "unrender rest of arguments" do
-      let program = args @"1234 name" \(x :| y :| Tail zs :: AtLeast 2 Int) -> raw $ pure (x,y,zs)
+      let program = args @"1234 name" \(x :< y :< Tail zs :: AtLeast 2 Int) -> raw $ pure (x,y,zs)
       let state = ["1","2","3","4"]
       let expected = Just (1,2,[3,4])
       result <- runCommanderT (run program) state
@@ -48,13 +48,13 @@ spec = do
     it "parses exactly n argumnets" do
       let program = argsN @"123" @3 @Int \x -> raw $ pure x
       let state = ["1","2","3","4"]
-      let expected = Just $ 1 :| 2 :| 3 :| Tail Proxy
+      let expected = Just $ 1 :< 2 :< 3 :< Tail Proxy
       result <- runCommanderT (run program) state
       result `shouldBe` expected
 
     it "leaves remaining values in state" do
       let program :: ProgramT (Args "consumer" (Exact 2 Int) & Args "remaining" [Int] & Raw) IO [Int]
-          program = argsN @"consumer" @2 \(_ :| _ :| Tail Proxy) -> args $ raw . pure
+          program = argsN @"consumer" @2 \(_ :< _ :< Tail Proxy) -> args $ raw . pure
       let state = ["1","2","3","4"]
       let expected = Just [3,4]
       result <- runCommanderT (run program) state

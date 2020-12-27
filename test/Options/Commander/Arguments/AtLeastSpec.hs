@@ -10,12 +10,12 @@ spec :: Spec
 spec = do
   describe "AtLeast" do
     describe "FromList" do
-      it "has enough" $ fromList [1,2,3,4] `shouldBe` (Just $ 1 :| 2 :| Tail [3,4])
+      it "has enough" $ fromList [1,2,3,4] `shouldBe` (Just $ 1 :< 2 :< Tail [3,4])
       it "not enough" $ fromList [1,2] `shouldBe` (Nothing :: Maybe (AtLeast 3 Int))
 
     describe "Foldable" do
-      it "toList" $ toList (1 :| 2 :| Tail [3,4]) `shouldBe` [1,2,3,4]
-      it "foldr" $ foldr (:) [5] (1 :| 2 :| Tail [3,4]) `shouldBe` [1,2,3,4,5]
+      it "toList" $ toList (1 :< 2 :< Tail [3,4]) `shouldBe` [1,2,3,4]
+      it "foldr" $ foldr (:) [5] (1 :< 2 :< Tail [3,4]) `shouldBe` [1,2,3,4,5]
 
   describe "AtLeastTail" do
     describe "FromList" do
@@ -35,7 +35,7 @@ spec = do
   describe "Exactly" do
     describe "FromList" do
       it "has correct number of elements" $
-        fromList [1,2,3] `shouldBe` Just (1 :| 2 :| 3 :| Tail Proxy)
+        fromList [1,2,3] `shouldBe` Just (1 :< 2 :< 3 :< Tail Proxy)
 
       it "to few elements" $
         fromList [1,2] `shouldBe` (Nothing :: Maybe (Exact 3 Int))
