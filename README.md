@@ -315,3 +315,23 @@ data family ProgramT, as well as its semantics in terms of the CommanderT monad,
 which is something like a free backtracking monad. Users should not have to make
 instances of this class, as the common CLI elements are already defined as
 instances. Of course, you can if you want to, and it can be profitable to do so.
+
+## Similar Projects
+
+- [ReadArgs](https://hackage.haskell.org/package/ReadArgs) Simple command line argument parsing
+- [argparser](https://hackage.haskell.org/package/argparser) Command line parsing framework for console applications
+- [cli-extras](https://hackage.haskell.org/package/cli-extras) Miscellaneous utilities for building and working with command line interfaces
+- [cli](https://hackage.haskell.org/package/cli) CLI
+- [cmdargs](https://hackage.haskell.org/package/cmdargs) Command line argument processing
+- [cmdtheline](https://hackage.haskell.org/package/cmdtheline) Declarative command-line option parsing and documentation library.
+- [configifier](https://hackage.haskell.org/package/configifier) parser for config files, shell variables, command line args.
+- [configuration-tools](https://hackage.haskell.org/package/configuration-tools) Tools for specifying and parsing configurations
+- [console-program](https://hackage.haskell.org/package/console-program) Interpret the command line and a config file as commands and options
+- [getopt-generics](https://hackage.haskell.org/package/getopt-generics) Create command line interfaces with ease
+- [hflags](https://hackage.haskell.org/package/hflags) Command line flag parser, very similar to Google's gflags
+- [multiarg](https://hackage.haskell.org/package/multiarg) Command lines for options that take multiple arguments
+- [options](https://hackage.haskell.org/package/options) A powerful and easy-to-use command-line option parser.
+- [parseargs](https://hackage.haskell.org/package/parseargs) Parse command-line arguments
+- [shell-utility](https://hackage.haskell.org/package/shell-utility) Utility functions for writing command-line programs
+- [symantic-cli](https://hackage.haskell.org/package/symantic-cli) Symantics for parsing and documenting a CLI
+
