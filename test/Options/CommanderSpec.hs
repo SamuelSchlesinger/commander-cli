@@ -5,7 +5,7 @@ import Test
 
 spec :: Spec
 spec = do
-  xdescribe "bigProgTests" do
+  describe "bigProgTests" do
     let program
           :: ProgramT
               ( Sub "argument" & Arg "arg" String & Flag '["flag"] & Raw
