@@ -27,5 +27,5 @@ parseTask taskName
           let (concat . map (fromRight undefined) -> description, xs') = span isRight xs
           Task{priorities} <- sectionByPriority xs'
           Just $ Task taskName ((priority, description) : priorities)
-        Right _ : xs -> Nothing
+        Right _ : _ -> Nothing
         [] -> Just $ Task taskName []

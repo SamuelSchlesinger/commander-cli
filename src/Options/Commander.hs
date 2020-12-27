@@ -111,7 +111,6 @@ module Options.Commander (
   , module Control.Monad.Commander
 ) where
 
-import GHC.TypeLits (Symbol, KnownSymbol)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
 import Control.Monad.Commander
@@ -144,7 +143,7 @@ toplevel p = named (subMulti (usage @(Named s & (Sub '["help","-h","--help"] & R
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.
 usage :: forall p m. (MonadIO m, HasProgram p) => ProgramT Raw m ()
-usage = raw $ do
-  liftIO $ putStrLn "usage:"
-  liftIO $ putStrLn (document @p)
+usage = raw $ liftIO do
+  putStrLn "usage:"
+  putStrLn (document @p)
 
