@@ -16,8 +16,8 @@ import Control.Monad
 
 type TaskManager
   = Named "task-manager"
-  & Annotated "the directory in which we keep our task files" (Env 'Optional "TASK_DIRECTORY" FilePath)
-    & ("help"
+  & Annotated "the directory in which we keep our task files" (Env 'Optional '["TASK_DIRECTORY"] FilePath)
+    & (Sub '["help"]
       & Description "Displays this help text."
       & Raw
      + TaskProgram "edit" "Edits an already existing task. Fails if the task does not exist."
@@ -28,9 +28,9 @@ type TaskManager
      + Raw
     )
 
-type TaskProgram x desc = x & Description desc & Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
+type TaskProgram x desc = Sub '[x] & Description desc & Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
 
-type TasklessProgram x desc = x & Description desc & Raw
+type TasklessProgram x desc = Sub '[x] & Description desc & Raw
   
 taskManager :: ProgramT TaskManager IO ()
 taskManager = named @"task-manager" . annotated . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
@@ -42,9 +42,11 @@ taskManager = named @"task-manager" . annotated . envOptDef @"TASK_DIRECTORY" "t
   <+> sub @"priorities" (description $ listPriorities tasksFilePath)
   <+> usage @TaskManager
 
+editTask :: FilePath -> ProgramT (Annotated annotation (Arg "task-name" String) & Raw) IO ()
 editTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw 
-  $ withTask tasksFilePath taskName $ \Context{home} task -> callProcess "vim" [home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"]
+  $ withTask tasksFilePath taskName $ \Context{home} _ -> callProcess "vim" [home ++ "/" <> tasksFilePath <> "/" ++ taskName ++ ".task"]
 
+newTask :: FilePath -> ProgramT (Annotated annotation (Arg "task-name" String) & Raw) IO ()
 newTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw $ do
   Context{home, tasks} <- initializeOrFetch tasksFilePath
   if not (taskName `elem` tasks)
@@ -55,8 +57,9 @@ newTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw $ do
       callProcess "vim" [path]
     else putStrLn $ "task " ++ taskName ++ " already exists."
 
+closeTask :: FilePath -> ProgramT (Annotated annotation (Arg "task-name" String) & Raw) IO ()
 closeTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw 
-  $ withTask tasksFilePath taskName $ \Context{home, tasks} mtask ->
+  $ withTask tasksFilePath taskName $ \Context{home} mtask ->
     case mtask of
       Just Task{priorities} ->
         if priorities == [] 
@@ -64,10 +67,12 @@ closeTask tasksFilePath = annotated $ arg @"task-name" $ \taskName -> raw
           else putStrLn $ "task " ++ taskName ++ " has remaining priorities."
       Nothing -> putStrLn "task is corrupted"
 
+listTasks :: FilePath -> ProgramT Raw IO ()
 listTasks tasksFilePath = raw $ do
   Context{tasks} <- initializeOrFetch tasksFilePath
   mapM_ putStrLn tasks
 
+listPriorities :: FilePath -> ProgramT Raw IO ()
 listPriorities tasksFilePath = raw $ do
   Context{tasks} <- initializeOrFetch tasksFilePath
   forM_ tasks $ \taskName -> withTask tasksFilePath taskName $ \_ mtask -> 

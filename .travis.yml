@@ -60,6 +60,7 @@ before_install:
   - BENCH=--enable-benchmarks
   - HEADHACKAGE=false
   - rm -f $CABALHOME/config
+  - sudo apt-get -y install hspec-discover
   - |
     echo "verbose: normal +nowrap +markoutput"          >> $CABALHOME/config
     echo "remote-build-reporting: anonymous"            >> $CABALHOME/config
