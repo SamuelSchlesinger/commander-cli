@@ -1,8 +1,10 @@
 module Options.Commander.Environment where
 
+import Data.List.NonEmpty (NonEmpty)
+import Data.Text (pack)
+import Language.Haskell.TH (ExpQ, TypeQ, stringE)
 import Options.Commander.Imports
 import System.Environment (lookupEnv)
-import Data.Text (pack)
 
 
 -- | The type level 'env'ironment variable combinator, taking a name as
@@ -11,7 +13,7 @@ import Data.Text (pack)
 data Env :: Optionality -> [Symbol] -> * -> *
 
 -- | The type level tag for whether or not a variable is required or not.
-data Optionality = Required | Optional
+data Optionality = Required | Optional (Maybe Symbol)
 
 instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Required names t & p) where
   newtype ProgramT (Env 'Required names t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
@@ -25,22 +27,21 @@ instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Requir
     ("required env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
     (documentation @p)]
 
-instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Optional names t & p) where
-  data ProgramT (Env 'Optional names t & p) m a = EnvProgramT'Optional
-    { unEnvProgramT'Optional :: Maybe t -> ProgramT p m a
-    , unEnvDefault :: Maybe t }
+instance (Unrender t, SymbolList names, HasProgram p, MaybeSymbol def) => HasProgram (Env ('Optional def) names t & p) where
+  newtype ProgramT (Env ('Optional def) names t & p) m a = EnvProgramT'Optional {unEnvProgramT'Optional :: Maybe t -> ProgramT p m a}
   run f = Action $ \state ->
     traverse lookupEnv (symbolList @names) >>=
     catMaybes >>> (fmap (unrender . pack) :: [String] -> [Maybe t]) >>>
     return . (, state) . \case
-    [] -> run $ unEnvProgramT'Optional f $ unEnvDefault f
+    [] -> run $ unEnvProgramT'Optional f Nothing
     xs -> case catMaybes xs of
       [] -> Defeat
       x:_ -> run $ unEnvProgramT'Optional f $ Just x
-  hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
+  hoist n (EnvProgramT'Optional f) = EnvProgramT'Optional (hoist n . f)
   documentation = [Node
-    ("optional env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
+    ("optional env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t <> defaultValDoc)
     (documentation @p)]
+    where defaultValDoc = fromMaybe "" $ (" :: default of \"" <>) <$> maybeSymbol @def <&> (<> "\"")
 
 -- | Required environment variable combinator
 env :: forall name p x m a.
@@ -61,7 +62,7 @@ envMulti = EnvProgramT'Required
 envOpt :: forall name x p m a.
      KnownSymbol name
   => (Maybe x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional '[name] x & p) m a
+  -> ProgramT (Env ('Optional 'Nothing) '[name] x & p) m a
 envOpt = envOptMulti
 
 -- | Optional environment variable combinator with multiple names resolving to the same variable
@@ -69,26 +70,21 @@ envOptMulti
   :: forall names x p m a.
      SymbolList names
   => (Maybe x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional names x & p) m a
-envOptMulti = flip EnvProgramT'Optional Nothing
+  -> ProgramT (Env ('Optional 'Nothing) names x & p) m a
+envOptMulti = EnvProgramT'Optional
 
 -- | Optional environment variable combinator with default
-envOptDef :: forall name x p m a.
-     KnownSymbol name
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional '[name] x & p) m a
-envOptDef = envOptDefMulti
+envOptDef :: forall t. Unrender t => String -> String -> ExpQ
+envOptDef = envOptDefMulti @t . pure
 
 -- | Optional environment variable combinator with default
-envOptDefMulti
-  :: forall names x p m a.
-     SymbolList names
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional names x & p) m a
-envOptDefMulti x f = EnvProgramT'Optional
-  { unEnvDefault = Just x
-  , unEnvProgramT'Optional = maybe (error "Violated invariant of optEnvDef") f
-  }
+envOptDefMulti :: forall t. Unrender t => NonEmpty String -> String -> ExpQ
+envOptDefMulti names def = do
+  checkUnrender @t def
+  [e| EnvProgramT'Optional . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(t) -> ProgramT p m a) -> ProgramT (Env ('Optional ('Just $(symbolType def))) $(ns) $(t) & p) m a |]
+  where
+  t :: TypeQ
+  t = fromTypeable @t
+  ns :: TypeQ
+  ns = promotedSymbolList $ fmap symbolType names
 

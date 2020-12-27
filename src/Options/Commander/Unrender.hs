@@ -2,7 +2,7 @@ module Options.Commander.Unrender where
 
 import Data.Word
 import Numeric.Natural
-import Data.Typeable (Typeable)
+import Type.Reflection (Typeable)
 import Data.Int
 import qualified Data.ByteString as SBS
 import qualified Data.ByteString.Char8 as BS8
@@ -10,6 +10,11 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text, pack, unpack, find)
 import Data.Text.Read (decimal, signed)
 import Control.Applicative (Alternative((<|>)))
+import Control.Monad.Fail (MonadFail)
+import Options.Commander.Internal (showTypeRep)
+import Control.Monad (when)
+import Data.Maybe (isNothing)
+import Data.String (IsString(fromString))
 
 
 -- | A class for interpreting command line arguments into Haskell types.
@@ -76,4 +81,7 @@ deriving via WrappedNatural Word64 instance Unrender Word64
 instance Unrender Char where
   unrender = find (const True)
 
+checkUnrender :: forall t m. (Unrender t, MonadFail m) => String -> m ()
+checkUnrender def = when (isNothing $ unrender @t $ fromString def) $
+  fail $ "Unrender faild for type \"" <> showTypeRep @t <> "\" on the default value \"" <> def <> "\"."
 

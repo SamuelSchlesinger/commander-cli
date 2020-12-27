@@ -16,7 +16,7 @@ import Control.Monad
 
 type TaskManager
   = Named "task-manager"
-  & Annotated "the directory in which we keep our task files" (Env 'Optional '["TASK_DIRECTORY"] FilePath)
+  & Annotated "the directory in which we keep our task files" (Env ('Optional ('Just "tasks")) '["TASK_DIRECTORY"] FilePath)
     & (Sub '["help"]
       & Description "Displays this help text."
       & Raw
@@ -33,7 +33,7 @@ type TaskProgram x desc = Sub '[x] & Description desc & Annotated ("the task we'
 type TasklessProgram x desc = Sub '[x] & Description desc & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = named @"task-manager" . annotated . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
+taskManager = named @"task-manager" . annotated . $(envOptDef @String "TASK_DIRECTORY" "tasks") $ \tasksFilePath -> 
       sub @"help" (description $ usage @TaskManager)
   <+> sub @"edit" (description $ editTask tasksFilePath) 
   <+> sub @"open" (description $ newTask tasksFilePath)
