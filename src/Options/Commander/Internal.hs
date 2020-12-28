@@ -5,8 +5,8 @@ import Data.String (IsString(fromString))
 import Type.Reflection (Typeable, typeRep)
 -- import Type.Reflection (Typeable, typeRep, TypeRep, TyCon, tyConName, splitApps, someTypeRepTyCon)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
--- import Data.List.NonEmpty (NonEmpty, cons)
--- import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty, cons)
+import Data.Foldable (toList)
 -- import qualified Data.Maybe
 -- import Language.Haskell.TH (TypeQ, conT, mkName, appT, litT, strTyLit, promotedConsT)
 
@@ -27,14 +27,14 @@ showTypeRep = fromString $ show $ typeRep @a
 --   fromTypeRep = splitApps >>> \(x,xs) -> foldl appT (fromTypeCon x) $ fmap (fromTypeCon . someTypeRepTyCon) xs
 --   fromTypeCon :: TyCon -> TypeQ
 --   fromTypeCon = conT . mkName . tyConName
--- 
--- class SymbolList a where
---   symbolList :: forall b. IsString b => NonEmpty b
--- instance (KnownSymbol s, SymbolList (s' ': ss)) => SymbolList (s ': s' ': ss) where
---   symbolList = showSymbol @s `cons` symbolList @(s' ': ss)
--- instance KnownSymbol s => SymbolList '[s] where
---   symbolList = pure $ showSymbol @s
--- 
+
+class SymbolList a where
+  symbolList :: forall b. IsString b => NonEmpty b
+instance (KnownSymbol s, SymbolList (s' ': ss)) => SymbolList (s ': s' ': ss) where
+  symbolList = showSymbol @s `cons` symbolList @(s' ': ss)
+instance KnownSymbol s => SymbolList '[s] where
+  symbolList = pure $ showSymbol @s
+
 -- altMay :: (Monad m, Foldable f) => (a -> m (Maybe b)) -> f a -> m (Maybe b)
 -- altMay f = g . toList
 --   where
@@ -43,15 +43,15 @@ showTypeRep = fromString $ show $ typeRep @a
 --       Nothing -> g xs
 --       y -> pure y
 --     [] -> pure Nothing
--- 
--- intercalate :: forall f a. (Foldable f, Monoid a) => a -> f a -> a
--- intercalate x = f . toList
---   where
---   f = \case
---     y:z:ys -> f $ y <> x <> z : ys
---     [y] -> y
---     [] -> mempty
--- 
+
+intercalate :: forall f a. (Foldable f, Monoid a) => a -> f a -> a
+intercalate x = f . toList
+  where
+  f = \case
+    y:z:ys -> f $ y <> x <> z : ys
+    [y] -> y
+    [] -> mempty
+
 -- infixr 8 >>>
 -- (>>>) :: (a -> b) -> (b -> c) -> a -> c
 -- (>>>) = flip (.)

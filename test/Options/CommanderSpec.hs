@@ -9,7 +9,7 @@ spec = do
     let program
           :: ProgramT
               ( Sub "argument" & Arg "arg" String & Flag "~flag" & Raw
-              + Opt "-opt" "option-test" Word & Sub "option" & Raw )
+              + Opt '["-opt"] "option-test" Word & Sub "option" & Raw )
               IO
               (Either (String,Bool) (Maybe Word))
         program = (sub @"argument" $ arg $ \a -> flag $ \f -> raw $ pure $ Left (a,f)) <+>
