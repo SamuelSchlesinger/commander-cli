@@ -124,7 +124,7 @@ module Options.Commander (
     The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.
     It has the ability to backtrack and it maintains some state.
   -}
-  CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
+  CommanderT(Action, Defeat, Victory), runCommanderT, initialState, takeOptions, State(State, arguments, options, flags),
   -- ** Middleware for CommanderT
   {- |
     If you want to modify your interpreted CLI program, in its 'CommanderT'
@@ -432,15 +432,16 @@ instance (KnownSymbol sub, HasProgram p) => HasProgram (sub & p) where
 initialState :: IO State
 initialState = do
   args <- getArgs
-  let (opts, args', flags) = takeOptions args
-  return $ State args' (HashMap.fromList opts) (HashSet.fromList flags) 
-    where
-      takeOptions :: [String] -> ([(Text, Text)], [Text], [Text])
-      takeOptions = go [] [] [] where
-        go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
-        go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
-        go opts args flags (x : y) = go opts (pack x : args) flags y
-        go opts args flags [] = (opts, reverse args, flags)
+  return $ takeOptions args
+
+takeOptions :: [String] -> State
+takeOptions = toState . go [] [] []
+  where
+  go opts args flags (('~':x') : z) = go opts args (pack x' : flags) z
+  go opts args flags (('-':x) : y : z) = go ((pack x, pack y) : opts) args flags z
+  go opts args flags (x : y) = go opts (pack x : args) flags y
+  go opts args flags [] = (opts, reverse args, flags)
+  toState (opts, args', flags) = State args' (HashMap.fromList opts) (HashSet.fromList flags) 
 
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags that I get using the 'initialState' function,
