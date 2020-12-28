@@ -88,7 +88,7 @@ module Options.Commander (
     variables as well. We also have a convenience combinator, 'toplevel',
     which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
+  arg, args, argsN, argsButN, opt, optDef, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
   -- ** Run CLI Programs
   {- |
     To run a 'ProgramT' (a specification of a CLI program), you will 
@@ -99,7 +99,7 @@ module Options.Commander (
     Each 'ProgramT' has a type level description, build from these type level
     combinators.
   -}
-  type (&), type (+), Arg, Opt, Named, Raw, Sub, Flag, Env, Optionality(Required, Optional), Description, Annotated,
+  type (&), type (+), Arg, Args, Opt, Named, Raw, Sub, Flag, Env, Optionality(Required, Optional), Description, Annotated,
   -- ** Interpreting CLI Programs
   {- |
     The 'HasProgram' class forms the backbone of this library, defining the
@@ -132,9 +132,12 @@ module Options.Commander (
     provided for debugging complex CLI programs, in case they aren't doing
     what you'd expect.
   -}
-  Middleware, logState, transform, withActionEffects, withDefeatEffects, withVictoryEffects
+  Middleware, logState, transform, withActionEffects, withDefeatEffects, withVictoryEffects,
+  module Options.Commander.Arguments.AtLeast,
+  module Data.Proxy
 ) where
 
+import Data.Proxy(Proxy(Proxy))
 import Options.Commander.Annotated
 import Options.Commander.Combine
 import Options.Commander.Description
@@ -145,6 +148,8 @@ import Options.Commander.Subcommand
 import Options.Commander.Middleware
 import Options.Commander.Flag
 import Options.Commander.Argument
+import Options.Commander.Arguments
+import Options.Commander.Arguments.AtLeast
 import Options.Commander.Environment
 import Options.Commander.Option
 

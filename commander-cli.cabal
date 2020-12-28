@@ -26,6 +26,8 @@ library
                        Options.Commander.Environment
                        Options.Commander.Flag
                        Options.Commander.Argument
+                       Options.Commander.Arguments
+                       Options.Commander.Arguments.AtLeast
                        Options.Commander.Description
                        Options.Commander.Option
                        Options.Commander.Imports
@@ -68,7 +70,8 @@ library
                        text >=1.2 && <2,
                        unordered-containers >=0.2 && < 1,
                        commandert >=0.1,
-                       containers >=0.1
+                       containers >=0.1,
+                       transformers >= 0.5 && < 0.6
   hs-source-dirs:      src
   ghc-options:         -Wall
   default-language:    Haskell2010
@@ -102,6 +105,8 @@ test-suite test-commander
   hs-source-dirs:      test
   other-modules:
                        Options.Commander.ArgumentSpec
+                       Options.Commander.Arguments.AtLeastSpec
+                       Options.Commander.ArgumentsSpec
                        Options.Commander.EnvironmentSpec
                        Options.Commander.FlagSpec
                        Options.Commander.OptionSpec
@@ -112,8 +117,10 @@ test-suite test-commander
   default-extensions:
                        BlockArguments
                        DataKinds
+                       GADTs
                        OverloadedStrings
                        RankNTypes
+                       ScopedTypeVariables
                        TypeApplications
                        TypeOperators
   build-depends:       base >= 4.12 && < 5,

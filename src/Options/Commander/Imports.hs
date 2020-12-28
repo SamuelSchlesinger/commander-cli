@@ -22,7 +22,7 @@ import Data.Functor
 import Data.Maybe hiding (catMaybes)
 import Data.Proxy
 import Data.Tree (Tree(Node), Forest)
-import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+import GHC.TypeLits (KnownSymbol, Symbol, symbolVal, KnownNat, natVal)
 import Options.Commander.Internal
 import Options.Commander.Program
 import Options.Commander.Sequence
