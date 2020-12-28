@@ -67,7 +67,7 @@ flagTest = maybe exitFailure (cond (pure ()) exitFailure) =<< runCommanderT (run
 test :: HasProgram p => ProgramT p IO Bool -> State -> IO (Maybe Bool)
 test prog state = runCommanderT (logState $ run prog) state
 
-bigProg :: Monad m => ProgramT ("argument" & Arg "arg" String & Flag "flag" & Raw + Opt "opt" "option-test" Word64 & "option" & Raw) m Bool
+bigProg :: Monad m => ProgramT (Sub "argument" & Arg "arg" String & Flag "flag" & Raw + Opt "opt" "option-test" Word64 & Sub "option" & Raw) m Bool
 bigProg = (sub @"argument" $ arg $ \a -> flag $ \f -> raw $ pure $ f && a == "arg") <+> (opt \o -> sub @"option" $ raw $ pure (o == Just 0))
 
 bigProgTests :: IO ()

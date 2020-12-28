@@ -20,9 +20,24 @@ source-repository head
   location: https://github.com/samuelschlesinger/commander-cli
 
 library
-  exposed-modules:     Options.Commander,
+  exposed-modules:     Options.Commander
+                       Options.Commander.Annotated
+                       Options.Commander.Combine
+                       Options.Commander.Environment
+                       Options.Commander.Flag
+                       Options.Commander.Argument
+                       Options.Commander.Description
+                       Options.Commander.Option
+                       Options.Commander.Imports
                        Options.Commander.Internal
-  other-extensions:    ViewPatterns,
+                       Options.Commander.Middleware
+                       Options.Commander.Named
+                       Options.Commander.Program
+                       Options.Commander.Raw
+                       Options.Commander.Sequence
+                       Options.Commander.Subcommand
+                       Options.Commander.Unrender
+  default-extensions:  ViewPatterns,
                        DerivingVia,
                        StandaloneDeriving,
                        GeneralizedNewtypeDeriving,
@@ -41,7 +56,11 @@ library
                        GADTs,
                        TypeOperators,
                        DataKinds,
-                       DeriveGeneric
+                       DeriveGeneric,
+                       RankNTypes,
+                       KindSignatures,
+                       LambdaCase,
+                       FlexibleContexts
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
@@ -50,6 +69,30 @@ library
                        commandert >=0.1,
                        containers >=0.1
   hs-source-dirs:      src
+  ghc-options:         -Wall
+  default-language:    Haskell2010
+
+executable task-manager
+  main-is:             Main.hs
+  other-modules:       Task, Task.IO, Task.CLI, Task.Codec
+  other-extensions:    TypeFamilies,
+                       ViewPatterns,
+                       ScopedTypeVariables,
+                       NamedFieldPuns,
+                       RecordWildCards,
+                       LambdaCase,
+                       DataKinds,
+                       TypeApplications,
+                       TypeOperators
+  build-depends:       base >=4.12 && < 5,
+                       mtl >=2.2 && <3,
+                       text >=1.2 && < 2,
+                       directory >= 1.3 && < 2,
+                       process >= 1.6 && < 2,
+                       commandert >=0.1,
+                       commander-cli
+  hs-source-dirs:      app
+  ghc-options:         -Wall
   default-language:    Haskell2010
 
 test-suite test-commander
