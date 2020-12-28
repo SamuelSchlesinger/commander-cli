@@ -9,13 +9,9 @@ data Arg :: Symbol -> * -> *
 
 instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Arg name t & p) where
   newtype ProgramT (Arg name t & p) m a = ArgProgramT { unArgProgramT :: t -> ProgramT p m a }
-  run f = Action $ \State{..} -> do
-    case arguments of
-      (x : xs) -> 
-        case unrender x of
-          Just t -> return (run (unArgProgramT f t), State{ arguments = xs, .. })  
-          Nothing -> return (Defeat, State{..})
-      [] -> return (Defeat, State{..})
+  run f = Action $ return . \case
+    (unrender -> Just x):xs -> (run $ unArgProgramT f x, xs)
+    xs -> (Defeat,xs)
   hoist n (ArgProgramT f) = ArgProgramT (hoist n . f)
   documentation = [Node
     ("argument: " <> showSymbol @name <> " :: " <> showTypeRep @t)

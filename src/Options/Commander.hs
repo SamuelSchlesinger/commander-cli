@@ -124,7 +124,7 @@ module Options.Commander (
     The 'CommanderT' monad is how your CLI programs are interpreted by 'run'.
     It has the ability to backtrack and it maintains some state.
   -}
-  CommanderT(Action, Defeat, Victory), runCommanderT, initialState, State(State, arguments, options, flags),
+  CommanderT(Action, Defeat, Victory), runCommanderT, State,
   -- ** Middleware for CommanderT
   {- |
     If you want to modify your interpreted CLI program, in its 'CommanderT'

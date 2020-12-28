@@ -60,7 +60,8 @@ library
                        RankNTypes,
                        KindSignatures,
                        LambdaCase,
-                       FlexibleContexts
+                       FlexibleContexts,
+                       TupleSections
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
@@ -97,10 +98,29 @@ executable task-manager
 
 test-suite test-commander
   type:                exitcode-stdio-1.0
-  main-is:             Test.hs
+  main-is:             Spec.hs
+  hs-source-dirs:      test
+  other-modules:
+                       Options.Commander.ArgumentSpec
+                       Options.Commander.EnvironmentSpec
+                       Options.Commander.FlagSpec
+                       Options.Commander.OptionSpec
+                       Options.Commander.RawSpec
+                       Options.Commander.SubcommandSpec
+                       Options.CommanderSpec
+                       Test
+  default-extensions:
+                       BlockArguments
+                       DataKinds
+                       OverloadedStrings
+                       RankNTypes
+                       TypeApplications
+                       TypeOperators
   build-depends:       base >= 4.12 && < 5,
                        text >=1.2 && < 2,
                        unordered-containers >= 0.2 && < 1,
                        commandert >=0.1,
-                       commander-cli
+                       commander-cli,
+                       hspec  >= 2.7.4 && < 3
+  ghc-options:         -Wall
   default-language:    Haskell2010
