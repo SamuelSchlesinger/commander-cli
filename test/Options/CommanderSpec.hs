@@ -8,7 +8,7 @@ spec = do
   describe "bigProgTests" do
     let program
           :: ProgramT
-              ( Sub "argument" & Arg "arg" String & Flag "~flag" & Raw
+              ( Sub "argument" & Arg "arg" String & Flag '["~flag"] & Raw
               + Opt '["-opt"] "option-test" Word & Sub "option" & Raw )
               IO
               (Either (String,Bool) (Maybe Word))
