@@ -61,14 +61,16 @@ library
                        KindSignatures,
                        LambdaCase,
                        FlexibleContexts,
-                       TupleSections
+                       TupleSections,
+                       TemplateHaskell
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
                        text >=1.2 && <2,
                        unordered-containers >=0.2 && < 1,
                        commandert >=0.1,
-                       containers >=0.1
+                       containers >=0.1,
+                       template-haskell >= 2.14.0.0 && < 3
   hs-source-dirs:      src
   ghc-options:         -Wall
   default-language:    Haskell2010
@@ -116,6 +118,8 @@ test-suite test-commander
                        RankNTypes
                        TypeApplications
                        TypeOperators
+                       TemplateHaskell
+                       KindSignatures
   build-depends:       base >= 4.12 && < 5,
                        text >=1.2 && < 2,
                        unordered-containers >= 0.2 && < 1,

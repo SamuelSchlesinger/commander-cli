@@ -108,7 +108,7 @@ module Options.Commander (
   -}
   HasProgram(run, hoist, documentation),
   ProgramT(ArgProgramT, unArgProgramT,
-           OptProgramT, unOptProgramT, unOptDefault,
+           OptProgramT, unOptProgramT,
            RawProgramT, unRawProgramT,
            SubProgramT, unSubProgramT,
            NamedProgramT, unNamedProgramT,
