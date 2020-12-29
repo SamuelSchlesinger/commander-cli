@@ -16,7 +16,7 @@ import Control.Monad
 
 type TaskManager
   = Named "task-manager"
-  & Annotated "the directory in which we keep our task files" (Env 'Optional "TASK_DIRECTORY" FilePath)
+  & Annotated "the directory in which we keep our task files" (Env 'Optional '["TASK_DIRECTORY"] FilePath)
     & (Sub "help"
       & Description "Displays this help text."
       & Raw
