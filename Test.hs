@@ -12,6 +12,7 @@ import Data.Word (Word64)
 import Data.Text
 import Control.Concurrent
 import Options.Commander
+import Options.Commander.Compatibility (AltEither, altEither)
 import Control.Monad
 import System.Exit
 import Control.Exception
