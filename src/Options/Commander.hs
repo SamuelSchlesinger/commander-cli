@@ -88,7 +88,7 @@ module Options.Commander (
     variables as well. We also have a convenience combinator, 'toplevel',
     which lets you add a name and a help command to your program using the 'usage' combinator.
   -}
-  arg, opt, optMulti, optDef, optDefMulti, raw, sub, named, flag, toplevel, (<+>), usage, env, envOpt, envOptDef, description, annotated,
+  arg, opt, optMulti, optDef, optDefMulti, raw, sub, named, flag, toplevel, (<+>), usage, env, envMulti, envOpt, envOptMulti, envOptDef, envOptDefMulti, description, annotated,
   -- ** Run CLI Programs
   {- |
     To run a 'ProgramT' (a specification of a CLI program), you will 
@@ -113,7 +113,7 @@ module Options.Commander (
            SubProgramT, unSubProgramT,
            NamedProgramT, unNamedProgramT,
            FlagProgramT, unFlagProgramT,
-           EnvProgramT'Optional, unEnvProgramT'Optional, unEnvDefault,
+           EnvProgramT'Optional, unEnvProgramT'Optional,
            EnvProgramT'Required, unEnvProgramT'Required,
            DescriptionProgramT,
            AnnotatedProgramT,

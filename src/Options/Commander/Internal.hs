@@ -3,12 +3,11 @@ module Options.Commander.Internal where
 import Data.Proxy (Proxy(Proxy))
 import Data.String (IsString(fromString))
 import Type.Reflection (Typeable, typeRep)
--- import Type.Reflection (Typeable, typeRep, TypeRep, TyCon, tyConName, splitApps, someTypeRepTyCon)
 import Type.Reflection (TypeRep, TyCon, tyConName, splitApps, someTypeRepTyCon)
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Data.List.NonEmpty (NonEmpty, cons)
 import Data.Foldable (toList)
--- import qualified Data.Maybe
+import qualified Data.Maybe
 import Language.Haskell.TH (TypeQ, conT, mkName, appT, litT, strTyLit, promotedConsT)
 
 
@@ -36,14 +35,14 @@ instance (KnownSymbol s, SymbolList (s' ': ss)) => SymbolList (s ': s' ': ss) wh
 instance KnownSymbol s => SymbolList '[s] where
   symbolList = pure $ showSymbol @s
 
--- altMay :: (Monad m, Foldable f) => (a -> m (Maybe b)) -> f a -> m (Maybe b)
--- altMay f = g . toList
---   where
---   g = \case
---     x:xs -> f x >>= \case
---       Nothing -> g xs
---       y -> pure y
---     [] -> pure Nothing
+altMay :: (Monad m, Foldable f) => (a -> m (Maybe b)) -> f a -> m (Maybe b)
+altMay f = g . toList
+  where
+  g = \case
+    x:xs -> f x >>= \case
+      Nothing -> g xs
+      y -> pure y
+    [] -> pure Nothing
 
 intercalate :: forall f a. (Foldable f, Monoid a) => a -> f a -> a
 intercalate x = f . toList
@@ -57,8 +56,8 @@ infixr 8 >>>
 (>>>) :: (a -> b) -> (b -> c) -> a -> c
 (>>>) = flip (.)
 
--- catMaybes :: Foldable f => f (Maybe a) -> [a]
--- catMaybes = Data.Maybe.catMaybes . toList
+catMaybes :: Foldable f => f (Maybe a) -> [a]
+catMaybes = Data.Maybe.catMaybes . toList
 
 promotedSymbolList :: Foldable f => f TypeQ -> TypeQ
 promotedSymbolList = foldr (\x y -> promotedConsT `appT` x `appT` y) [t|('[] :: [Symbol])|]

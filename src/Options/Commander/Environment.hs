@@ -1,6 +1,8 @@
 module Options.Commander.Environment where
 
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text (pack)
+import Language.Haskell.TH (ExpQ, TypeQ, stringE)
 import Options.Commander.Imports
 import System.Environment (lookupEnv)
 
@@ -8,62 +10,81 @@ import System.Environment (lookupEnv)
 -- | The type level 'env'ironment variable combinator, taking a name as
 -- input, allowing your program to take environment variables as input
 -- automatically.
-data Env :: Optionality -> Symbol -> * -> *
+data Env :: Optionality -> [Symbol] -> * -> *
 
 -- | The type level tag for whether or not a variable is required or not.
-data Optionality = Required | Optional
+data Optionality = Required | Optional (Maybe Symbol)
 
-instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Required name t & p) where
-  newtype ProgramT (Env 'Required name t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
+instance (Unrender t, SymbolList names, HasProgram p) => HasProgram (Env 'Required names t & p) where
+  newtype ProgramT (Env 'Required names t & p) m a = EnvProgramT'Required { unEnvProgramT'Required :: t -> ProgramT p m a }
   run f = Action $ \state -> do
-    val <- lookupEnv $ showSymbol @name
-    case val of
-      Just v ->
-        case unrender (pack v) of
-          Just t -> return (run (unEnvProgramT'Required f t), state)  
-          Nothing -> return (Defeat, state)
-      Nothing -> return (Defeat, state)
+    val <- altMay (fmap (>>= unrender . pack) . lookupEnv) $ symbolList @names -- this may not fit into the design where unrender failurs use alternative and not just defeated at a unrender failure
+    return . (, state) $ case val of
+      Just t -> run $ unEnvProgramT'Required f t
+      Nothing -> Defeat
   hoist n (EnvProgramT'Required f) = EnvProgramT'Required (hoist n . f)
   documentation = [Node
-    ("required env: " <> showSymbol @name <> " :: " <> showTypeRep @t)
+    ("required env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t)
     (documentation @p)]
 
-instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Env 'Optional name t & p) where
-  data ProgramT (Env 'Optional name t & p) m a = EnvProgramT'Optional
-    { unEnvProgramT'Optional :: Maybe t -> ProgramT p m a
-    , unEnvDefault :: Maybe t }
-  run f = Action $ \state -> do
-    val <- lookupEnv $ showSymbol @name
-    case val of
-      Just v -> do
-        case unrender @t (pack v) of
-          Just t -> return (run (unEnvProgramT'Optional f (Just t)), state)  
-          Nothing -> return (Defeat, state)
-      Nothing -> return (run (unEnvProgramT'Optional f (unEnvDefault f)), state)
-  hoist n (EnvProgramT'Optional f d) = EnvProgramT'Optional (hoist n . f) d
+instance (Unrender t, SymbolList names, HasProgram p, MaybeSymbol def) => HasProgram (Env ('Optional def) names t & p) where
+  newtype ProgramT (Env ('Optional def) names t & p) m a = EnvProgramT'Optional {unEnvProgramT'Optional :: Maybe t -> ProgramT p m a}
+  run f = Action $ \state ->
+    traverse lookupEnv (symbolList @names) >>=
+    catMaybes >>> (fmap (unrender . pack) :: [String] -> [Maybe t]) >>>
+    return . (, state) . \case
+    [] -> run $ unEnvProgramT'Optional f Nothing
+    xs -> case catMaybes xs of
+      [] -> Defeat
+      x:_ -> run $ unEnvProgramT'Optional f $ Just x
+  hoist n (EnvProgramT'Optional f) = EnvProgramT'Optional (hoist n . f)
   documentation = [Node
-    ("optional env: " <> showSymbol @name <> " :: " <> showTypeRep @t)
+    ("optional env: " <> intercalate ", " (symbolList @names) <> " :: " <> showTypeRep @t <> defaultValDoc)
     (documentation @p)]
+    where defaultValDoc = fromMaybe "" $ (" :: default of \"" <>) <$> maybeSymbol @def <&> (<> "\"")
 
 -- | Required environment variable combinator
 env :: forall name p x m a.
      KnownSymbol name
   => (x -> ProgramT p m a)
-  -> ProgramT (Env 'Required name x & p) m a
+  -> ProgramT (Env 'Required '[name] x & p) m a
 env = EnvProgramT'Required
+
+-- | Required environment variable combinator with multiple names resolving to the same variable
+envMulti
+  :: forall names p x m a.
+     SymbolList names
+  => (x -> ProgramT p m a)
+  -> ProgramT (Env 'Required names x & p) m a
+envMulti = EnvProgramT'Required
 
 -- | Optional environment variable combinator
 envOpt :: forall name x p m a.
      KnownSymbol name
   => (Maybe x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional name x & p) m a
-envOpt = flip EnvProgramT'Optional Nothing
+  -> ProgramT (Env ('Optional 'Nothing) '[name] x & p) m a
+envOpt = envOptMulti
+
+-- | Optional environment variable combinator with multiple names resolving to the same variable
+envOptMulti
+  :: forall names x p m a.
+     SymbolList names
+  => (Maybe x -> ProgramT p m a)
+  -> ProgramT (Env ('Optional 'Nothing) names x & p) m a
+envOptMulti = EnvProgramT'Optional
 
 -- | Optional environment variable combinator with default
-envOptDef :: forall name x p m a.
-     KnownSymbol name
-  => x
-  -> (x -> ProgramT p m a)
-  -> ProgramT (Env 'Optional name x & p) m a
-envOptDef x f = EnvProgramT'Optional { unEnvDefault = Just x, unEnvProgramT'Optional = \case { Just y -> f y; Nothing -> error "Violated invariant of optEnvDef" } }
+envOptDef :: forall t. Unrender t => String -> String -> ExpQ
+envOptDef = envOptDefMulti @t . pure
+
+-- | Optional environment variable combinator with default
+envOptDefMulti :: forall t. Unrender t => NonEmpty String -> String -> ExpQ
+envOptDefMulti names def = do
+  checkUnrender @t def
+  [e| EnvProgramT'Optional . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(t) -> ProgramT p m a) -> ProgramT (Env ('Optional ('Just $(symbolType def))) $(ns) $(t) & p) m a |]
+  where
+  t :: TypeQ
+  t = fromTypeable @t
+  ns :: TypeQ
+  ns = promotedSymbolList $ fmap symbolType names
 
