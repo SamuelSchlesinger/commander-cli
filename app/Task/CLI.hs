@@ -3,6 +3,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Task.CLI where
 
 import Options.Commander
@@ -16,8 +18,8 @@ import Control.Monad
 
 type TaskManager
   = Named "task-manager"
-  & Annotated "the directory in which we keep our task files" (Env 'Optional "TASK_DIRECTORY" FilePath)
-    & ("help"
+  & Annotated "the directory in which we keep our task files" (Env ('Optional ('Just "tasks")) '["TASK_DIRECTORY"] FilePath)
+    & (Sub "help"
       & Description "Displays this help text."
       & Raw
      + TaskProgram "edit" "Edits an already existing task. Fails if the task does not exist."
@@ -28,12 +30,12 @@ type TaskManager
      + Raw
     )
 
-type TaskProgram x desc = x & Description desc & Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
+type TaskProgram x desc = Sub x & Description desc & Annotated ("the task we're going to " `AppendSymbol` x) (Arg "task-name" String) & Raw
 
-type TasklessProgram x desc = x & Description desc & Raw
+type TasklessProgram x desc = Sub x & Description desc & Raw
   
 taskManager :: ProgramT TaskManager IO ()
-taskManager = named @"task-manager" . annotated . envOptDef @"TASK_DIRECTORY" "tasks" $ \tasksFilePath -> 
+taskManager = named @"task-manager" . annotated . $(envOptDef @FilePath "TASK_DIRECTORY" "tasks") $ \tasksFilePath -> 
       sub @"help" (description $ usage @TaskManager)
   <+> sub @"edit" (description $ editTask tasksFilePath) 
   <+> sub @"open" (description $ newTask tasksFilePath)
