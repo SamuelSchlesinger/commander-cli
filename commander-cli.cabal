@@ -21,7 +21,23 @@ source-repository head
 
 library
   exposed-modules:     Options.Commander
-  other-extensions:    ViewPatterns,
+                       Options.Commander.Annotated
+                       Options.Commander.Combine
+                       Options.Commander.Environment
+                       Options.Commander.Flag
+                       Options.Commander.Argument
+                       Options.Commander.Description
+                       Options.Commander.Option
+                       Options.Commander.Imports
+                       Options.Commander.Internal
+                       Options.Commander.Middleware
+                       Options.Commander.Named
+                       Options.Commander.Program
+                       Options.Commander.Raw
+                       Options.Commander.Sequence
+                       Options.Commander.Subcommand
+                       Options.Commander.Unrender
+  default-extensions:  ViewPatterns,
                        DerivingVia,
                        StandaloneDeriving,
                        GeneralizedNewtypeDeriving,
@@ -40,7 +56,11 @@ library
                        GADTs,
                        TypeOperators,
                        DataKinds,
-                       DeriveGeneric
+                       DeriveGeneric,
+                       RankNTypes,
+                       KindSignatures,
+                       LambdaCase,
+                       FlexibleContexts
   build-depends:       base >=4.12 && < 5,
                        bytestring >=0.8 && <1,
                        mtl >=2.2 && <3,
@@ -49,6 +69,7 @@ library
                        commandert >=0.1,
                        containers >=0.1
   hs-source-dirs:      src
+  ghc-options:         -Wall
   default-language:    Haskell2010
 
 executable task-manager
@@ -71,6 +92,7 @@ executable task-manager
                        commandert >=0.1,
                        commander-cli
   hs-source-dirs:      app
+  ghc-options:         -Wall
   default-language:    Haskell2010
 
 test-suite test-commander
