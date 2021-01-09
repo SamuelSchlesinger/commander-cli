@@ -21,6 +21,7 @@ source-repository head
 
 library
   exposed-modules:     Options.Commander
+                       Options.Commander.Internal
   other-extensions:    ViewPatterns,
                        DerivingVia,
                        StandaloneDeriving,
