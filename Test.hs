@@ -12,11 +12,13 @@ import Data.Word (Word64)
 import Data.Text
 import Control.Concurrent
 import Options.Commander
+import Options.Commander.Compatibility (AltEither, altEither)
 import Control.Monad
 import System.Exit
 import Control.Exception
 import System.Environment (setEnv)
 import Data.Maybe
+import Control.Arrow ((>>>))
 
 main :: IO ()
 main =
@@ -129,8 +131,10 @@ envOptDefTest = do
   setEnv "CORPUS" "POOP"
   testMaybeBool =<< test (envOptDefProg "POP" (== ("POOP" :: String))) (State mempty mempty mempty)
 
-eitherSwitchProg :: (x -> Bool) -> (y -> Bool) -> ProgramT (Arg "xy" (Either x y) & Raw) IO (Either Bool Bool)
-eitherSwitchProg xpred ypred = arg \case { Left x -> raw (pure (Left $ xpred x)); Right y -> raw (pure (Right $ ypred y)) }
+eitherSwitchProg :: (x -> Bool) -> (y -> Bool) -> ProgramT (Arg "xy" (AltEither x y) & Raw) IO (Either Bool Bool)
+eitherSwitchProg xpred ypred = arg $ altEither >>> \case
+  Left x -> raw $ pure $ Left $ xpred x
+  Right y -> raw $ pure $ Right $ ypred y
 
 eitherSwitchTest  :: IO ()
 eitherSwitchTest = do
