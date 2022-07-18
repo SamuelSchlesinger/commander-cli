@@ -1,7 +1,8 @@
 module Options.Commander.Middleware where
 
 import Control.Monad.Commander (CommanderT(Action,Defeat,Victory))
-import Control.Monad.Trans (MonadIO(..))
+-- import Control.Monad.Trans (MonadIO(..))
+import Control.Monad.IO.Class (MonadIO(..))
 import Options.Commander.Program (State)
 import Data.Bifunctor (first)
 import Data.Functor (($>))

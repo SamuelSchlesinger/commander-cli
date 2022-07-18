@@ -8,7 +8,7 @@ spec :: Spec
 spec = do
   describe "args" do
     it "unrender rest of arguments" do
-      let program = args @"1234 name" \(x :< y :< Tail zs :: AtLeast 2 Int) -> raw $ pure (x,y,zs)
+      let program = args @"1234 name" \(x :< y :< Tail zs :: AtLeast [] 2 Int) -> raw $ pure (x,y,zs)
       let state = ["1","2","3","4"]
       let expected = Just (1,2,[3,4])
       result <- runCommanderT (run program) state
@@ -22,7 +22,7 @@ spec = do
       result `shouldBe` expected
 
     it "parse fail" do
-      let program :: ProgramT (Args "123" (AtLeast 0 Int) & Raw) IO (AtLeast 0 Int)
+      let program :: ProgramT (Args "123" (AtLeast [] 0 Int) & Raw) IO (AtLeast [] 0 Int)
           program = args $ raw . pure
       let state = ["1","2","3abc"]
       let expected = Nothing
@@ -37,12 +37,12 @@ spec = do
         result <- runCommanderT (run program) state
         result `shouldBe` expected
 
-      it "AtLeastTail" do
-        let program = args @"AtLeastTail type" $ raw . pure
-        let state = ["1","2","3"]
-        let expected = Just $ Head [1] :> 2 :> 3 :: Maybe (AtLeastTail 2 Int)
-        result <- runCommanderT (run program) state
-        result `shouldBe` expected
+      -- it "AtLeastTail" do
+      --   let program = args @"AtLeastTail type" $ raw . pure
+      --   let state = ["1","2","3"]
+      --   let expected = Just $ Head [1] :> 2 :> 3 :: Maybe (AtLeastTail 2 Int)
+      --   result <- runCommanderT (run program) state
+      --   result `shouldBe` expected
 
   describe "argsN" do
     it "parses exactly n argumnets" do

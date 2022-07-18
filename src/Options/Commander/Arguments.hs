@@ -2,15 +2,18 @@ module Options.Commander.Arguments
   ( Args
   , ProgramT(ArgsProgramT)
   , args
+  , argsAL
   , argsN
   , argsButN
-  , module Options.Commander.Arguments.AtLeast
+  , module Options.Commander.Arguments.Collections
   ) where
 
-import Options.Commander.Arguments.AtLeast
+-- import Options.Commander.Arguments.AtLeast
+import Options.Commander.Arguments.Collections
 import Control.Monad ((>=>))
-import Control.Monad.State (StateT(runStateT), lift, mapStateT, get, put)
+import Control.Monad.Trans.State (StateT(runStateT), mapStateT, get, put)
 import Control.Monad.Trans.Maybe (MaybeT(MaybeT,runMaybeT), mapMaybeT)
+import Control.Monad.Trans.Class (lift)
 import Data.Bifunctor (first)
 import Options.Commander.Imports
 
@@ -40,7 +43,7 @@ instance (Unrender t, KnownSymbol name, HasProgram p) => HasProgram (Args name (
     (documentation @p)]
 
 
--- | Arguments combinator that consumes the rest of the arguments with at least n values
+-- | Arguments combinator that consumes the rest of the arguments
 args
   :: forall name f t p m a
    . (Unrender t, Monad m, FromList f)
@@ -56,6 +59,22 @@ argsN
   => (Exact n t -> ProgramT p m a)
   -> ProgramT (Args name (Exact n t) & p) m a
 argsN unArgsProgramT = ArgsProgramT {..}
+  where
+  unArgsConsume = do
+    s <- get
+    let (xs,s') = splitAt i s
+    ys <- lift $ MaybeT $ pure $ traverse unrender =<< fromList xs
+    put s'
+    pure ys
+  i = fromInteger $ natVal $ Proxy @n
+
+-- | Arguments combinator that consumes at least `n` of the rest of the arguments
+argsAL
+  :: forall name f n t p m a
+   . (KnownNat n, Unrender t, FromList (AtLeast f n), Traversable (AtLeast f n), Monad m)
+  => (AtLeast f n t -> ProgramT p m a)
+  -> ProgramT (Args name (AtLeast f n t) & p) m a
+argsAL unArgsProgramT = ArgsProgramT {..}
   where
   unArgsConsume = do
     s <- get

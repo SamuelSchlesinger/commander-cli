@@ -10,7 +10,6 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Text (Text, pack, unpack, find)
 import Data.Text.Read (decimal, signed)
 import Control.Applicative (Alternative((<|>)))
-import Control.Monad.Fail (MonadFail)
 import Options.Commander.Internal (showTypeRep)
 import Control.Monad (when)
 import Data.Maybe (isNothing)

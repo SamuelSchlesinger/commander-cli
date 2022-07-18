@@ -5,7 +5,6 @@ module Test
   ) where
 
 import Options.Commander
-import Control.Monad.Commander (runCommanderT)
 import Test.Hspec hiding (Arg)
 
 
