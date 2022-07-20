@@ -77,12 +77,10 @@ argsAL
 argsAL unArgsProgramT = ArgsProgramT {..}
   where
   unArgsConsume = do
-    s <- get
-    let (xs,s') = splitAt i s
+    xs <- get
     ys <- lift $ MaybeT $ pure $ traverse unrender =<< fromList xs
-    put s'
+    put []
     pure ys
-  i = fromInteger $ natVal $ Proxy @n
 
 -- | Arguments combinator that consumes all but the last n arguments
 argsButN
