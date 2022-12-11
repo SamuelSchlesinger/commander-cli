@@ -98,7 +98,7 @@ Okay, so we can expand the documentation. But what if I have an option to pass t
 ```haskell
 main = command_
   . toplevel @"argument-taker"
-  . optDef @"-m" @"mode" "Print" $ \mode ->
+  . $(optDef @String "-m" "mode" "Print") $ \mode ->
     arg @"example-argument" $ \arg ->
     description @"Takes the argument and prints it or not, depending on the mode" 
   . raw $ do
@@ -127,7 +127,7 @@ example program:
 ```haskell
 main = command_
   . toplevel @"argument-taker"
-  . optDef @"-m" @"mode" "Print" $ \mode ->
+  . $(optDef @String "-m" "mode" "Print") $ \mode ->
     arg @"example-argument" $ \arg ->
     flag @"~loud" $ \loud ->
     description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
@@ -162,7 +162,7 @@ main = command_
   $ defaultProgram <+> sub @"shriek" (raw (putStrLn "AHHHHH!!"))
   where
   defaultProgram = 
-      optDef @"-m" @"mode" "Print" $ \mode ->
+      $(optDef @String "-m" "mode" "Print") $ \mode ->
       arg @"example-argument" $ \arg ->
       flag @"~loud" $ \loud ->
       description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
@@ -208,7 +208,7 @@ main = command_
       )
   where
   defaultProgram argumentTakerDirectory = 
-      optDef @"-m" @"mode" "Print" $ \mode ->
+      $(optDef @String "-m" "mode" "Print") $ \mode ->
       arg @"example-argument" $ \arg ->
       flag @"~loud" $ \loud ->
       description @"Takes the argument and prints it or not, depending on the mode and possibly loudly" 
@@ -259,7 +259,7 @@ main = command_
       )
   where
   defaultProgram argumentTakerDirectory = 
-      optDef @"-m" @"mode" "Print" $ \mode ->
+      $(optDef @String "-m" "mode" "Print") $ \mode ->
       arg @"example-argument" $ \arg ->
       flag @"~loud" $ \loud ->
       description @"Takes the argument and prints it or not, depending on the mode" 
