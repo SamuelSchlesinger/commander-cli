@@ -50,23 +50,37 @@ optMulti
 optMulti = OptProgramT
 
 -- | Option combinator with a default value
+-- Result type: 
+--  :: forall option name x p m a.
+--     (KnownSymbol option, KnownSymbol name)
+--  => (x -> ProgramT p m a) 
+--  -> ProgramT (Opt '[option] name 'Nothing x & p) m a
 optDef
-  :: forall t.
-     Unrender t
-  => String -> String -> String -> ExpQ
-optDef = optDefMulti @t . pure
+  :: forall x.
+     Unrender x
+  => Option -> Name -> DefaultValue -> ExpQ
+optDef option name def = optDefMulti @x (pure option) name def
 
 -- | Option combinator with a default value that has multiple option matchs
+-- Result type: 
+-- :: forall options name x p m a.
+--  (KnownSymbol name)
+-- => (Maybe x -> ProgramT p m a) 
+-- -> ProgramT (Opt options name 'Nothing x & p) m a
 optDefMulti
-  :: forall t.
-     Unrender t
-  => NonEmpty String -> String -> String -> ExpQ
+  :: forall x.
+     Unrender x
+  => NonEmpty Option -> Name -> DefaultValue -> ExpQ
 optDefMulti options name def = do
-  checkUnrender @t def
-  [e| OptProgramT . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(t) -> ProgramT p m a) -> ProgramT (Opt $(os) $(symbolType name) ('Just $(symbolType def)) $(t) & p) m a |]
+  checkUnrender @x def
+  [e| OptProgramT . (. fromMaybe (fromJust $ unrender $(stringE def))) :: ($(x) -> ProgramT p m a) -> ProgramT (Opt $(os) $(symbolType name) ('Just $(symbolType def)) $(x) & p) m a |]
   where
-  t :: TypeQ
-  t = fromTypeable @t
+  x :: TypeQ
+  x = fromTypeable @x
   os :: TypeQ
   os = promotedSymbolList $ fmap symbolType options
+
+type Option = String
+type Name = String
+type DefaultValue = String
 
