@@ -5,6 +5,7 @@ module Options.Commander.Arguments
   , argsAL
   , argsN
   , argsButN
+  , argsWhile
   , module Options.Commander.Arguments.Collections
   ) where
 
@@ -97,4 +98,19 @@ argsButN unArgsProgramT = ArgsProgramT {..}
     put s'
     pure ys
   i = fromInteger $ natVal $ Proxy @n
+
+-- | Arguments combinator the consumes arguments that successfully unrender
+argsWhile
+  :: forall name f t p m a
+   . (Monad m, FromList f, Unrender t)
+  => (f t -> ProgramT p m a)
+  -> ProgramT (Args name (f t) & p) m a
+argsWhile unArgsProgramT = ArgsProgramT {..}
+  where
+  unArgsConsume = do
+    s <- get
+    let (xs, s') = spanJust unrender s
+    ys <- lift $ MaybeT $ pure $ fromList xs
+    put s'
+    pure ys
 
