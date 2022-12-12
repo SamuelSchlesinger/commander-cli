@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Options.Commander.Internal where
 
+import Data.Bifunctor (first)
 import Data.Proxy (Proxy(Proxy))
 import Data.String (IsString(fromString))
 import Type.Reflection (Typeable, typeRep, TypeRep, TyCon, tyConName, splitApps, someTypeRepTyCon)
@@ -69,4 +70,9 @@ promotedSymbolList = foldr (\x y -> promotedConsT `appT` x `appT` y) [t|('[] :: 
 class MaybeSymbol a where maybeSymbol :: IsString b => Maybe b
 instance KnownSymbol a => MaybeSymbol ('Just a) where maybeSymbol = Just $ showSymbol @a
 instance MaybeSymbol 'Nothing where maybeSymbol = Nothing
+
+spanJust :: (a -> Maybe b) -> [a] -> ([b], [a])
+spanJust f = \case
+  xs'@(x:xs) -> maybe (mempty,xs') (\y -> first (y :) $ spanJust f xs) (f x)
+  [] -> (mempty, mempty)
 
