@@ -84,3 +84,8 @@ checkUnrender :: forall t m. (Unrender t, MonadFail m) => String -> m ()
 checkUnrender def = when (isNothing $ unrender @t $ fromString def) $
   fail $ "Unrender faild for type \"" <> showTypeRep @t <> "\" on the default value \"" <> def <> "\"."
 
+newtype WrappedNum a = WrappedNum a
+  deriving newtype (Num, Real, Ord, Eq, Enum, Integral)
+instance (Num a, Typeable a) => Unrender (WrappedNum a) where
+  unrender = fmap (WrappedNum . fromInteger) . unrender
+
