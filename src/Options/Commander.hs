@@ -17,6 +17,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {- |
 Module: Options.Commander
 Description: A set of combinators for constructing and executing command line programs
