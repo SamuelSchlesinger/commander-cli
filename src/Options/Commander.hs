@@ -108,7 +108,7 @@ import Options.Commander.Unrender
 toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m) 
          => ProgramT p m () 
          -> ProgramT (Named s & (Sub '["help","-h","--help"] & Raw + p)) m ()
-toplevel p = named (subMulti (usage @(Named s & (Sub '["help","-h","--help"] & Raw + p))) <+> p)
+toplevel p = named (subMulti (usage @(Named s & (Sub '["help","-h","--help","?"] & Raw + p))) <+> p)
 
 -- | A meta-combinator that takes a type-level description of a command 
 -- line program and produces a simple usage program.
