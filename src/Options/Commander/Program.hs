@@ -5,6 +5,7 @@ import Control.Monad.Commander (CommanderT, runCommanderT)
 import Data.Text (Text, pack)
 import Data.Tree (Forest, drawForest)
 import System.Environment (getArgs)
+import System.Exit (exitWith, ExitCode(..))
 
 
 -- | This is the workhorse of the library. Basically, it allows you to 
@@ -27,24 +28,36 @@ class HasProgram p where
 type State = [Text]
 
 -- | This is a combinator which runs a 'ProgramT' with the options,
--- arguments, and flags that I get using the 'initialState' function,
--- ignoring the output of the program.
-command_ :: forall p a.
-            HasProgram p 
-         => ProgramT p IO a 
-         -> IO ()
+-- arguments, and flags. It should be used at the top of your program
+-- typically `main = command_ . toplevel @"my program" ...`.
+command_
+  :: forall p a
+   . HasProgram p 
+  => ProgramT p IO a 
+  -> IO ()
 -- command_ prog = void $ initialState >>= runCommanderT (run prog)
-command_ = void . command
+command_ prog = exitWith . maybe (ExitFailure 1) (const ExitSuccess) =<< command prog =<< getArgs
 
 -- | This is a combinator which runs a 'ProgramT' with the options,
--- arguments, and flags that I get using the 'initialState' function,
--- returning 'Just' the output of the program upon successful option and argument
--- parsing and returning 'Nothing' otherwise.
-command :: forall p a.
-           HasProgram p 
-        => ProgramT p IO a 
-        -> IO (Maybe a)
-command prog = runCommanderT (run prog) . fmap pack =<< getArgs
+-- arguments, and flags with the arguments passed in as strings.
+-- It returns 'Just' the output of the program upon successful 
+-- option and argument parsing and returning 'Nothing' otherwise.
+command
+  :: forall p a
+   . HasProgram p 
+  => ProgramT p IO a 
+  -> [String]
+  -> IO (Maybe a)
+command prog = runCommanderT (run prog) . fmap pack
+
+-- | Like `command` but takes Text arguments
+command'
+  :: forall p a
+   . HasProgram p 
+  => ProgramT p IO a 
+  -> [Text]
+  -> IO (Maybe a)
+command' = runCommanderT . run
 
 -- | Produce a 2-dimensional textual drawing of the 'Tree' description of
 -- this program.
