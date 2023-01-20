@@ -13,7 +13,7 @@ of such a command line interface is:
 
 
 The point of this library is mainly so that you can write command line
-interfaces quickly and easily, with somewhat useful help messages, and 
+interfaces quickly and easily, with somewhat useful help messages, and
 not have to write any boilerplate.
 -}
 module Options.Commander (
@@ -21,7 +21,7 @@ module Options.Commander (
   {- |
     To construct a 'ProgramT' (a specification of a CLI program), you can
     have 'arg'uments, 'opt'ions, 'raw' actions in a monad (typically IO),
-    'sub'programs, 'named' programs, 'env'ironment variables, you can combine 
+    'sub'programs, 'named' programs, 'env'ironment variables, you can combine
     programs together using '<+>', and you can generate primitive 'usage'
     information with 'usage'. There are combinators for retrieving environment
     variables as well. We also have a convenience combinator, 'toplevel',
@@ -57,7 +57,7 @@ module Options.Commander (
   -}
   -- ** Run CLI Programs
   {- |
-    To run a 'ProgramT' (a specification of a CLI program), you will 
+    To run a 'ProgramT' (a specification of a CLI program), you will
     need to use 'command' or 'command_'.
   -}
   , module  Options.Commander.Program
@@ -105,15 +105,17 @@ import Options.Commander.Unrender
 
 -- | A convenience combinator that constructs the program I often want
 -- to run out of a program I want to write.
-toplevel :: forall s p m. (HasProgram p, KnownSymbol s, MonadIO m) 
-         => ProgramT p m () 
-         -> ProgramT (Named s & (Sub '["help","-h","--help"] & Raw + p)) m ()
-toplevel p = named (subMulti (usage @(Named s & (Sub '["help","-h","--help","?"] & Raw + p))) <+> p)
+toplevel :: forall s p m a. (HasProgram p, KnownSymbol s, MonadIO m)
+         => a
+         -> ProgramT p m a
+         -> ProgramT (Named s & (Sub '["help","-h","--help"] & Raw + p)) m a
+toplevel x p = named (subMulti (usage @(Named s & (Sub '["help","-h","--help","?"] & Raw + p)) x) <+> p)
 
--- | A meta-combinator that takes a type-level description of a command 
+-- | A meta-combinator that takes a type-level description of a command
 -- line program and produces a simple usage program.
-usage :: forall p m. (MonadIO m, HasProgram p) => ProgramT Raw m ()
-usage = raw $ liftIO do
+usage :: forall p m a. (MonadIO m, HasProgram p) => a -> ProgramT Raw m a
+usage x = raw $ liftIO do
   putStrLn "usage:"
   putStrLn (document @p)
+  return x
 

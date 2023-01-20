@@ -8,7 +8,7 @@ import System.Environment (getArgs)
 import System.Exit (exitWith, ExitCode(..))
 
 
--- | This is the workhorse of the library. Basically, it allows you to 
+-- | This is the workhorse of the library. Basically, it allows you to
 -- 'run' your 'ProgramT'
 -- representation of your program as a 'CommanderT' and pump the 'State'
 -- through it until you've processed all of the arguments, options, and
@@ -32,20 +32,20 @@ type State = [Text]
 -- typically `main = command_ . toplevel @"my program" ...`.
 command_
   :: forall p a
-   . HasProgram p 
-  => ProgramT p IO a 
+   . HasProgram p
+  => ProgramT p IO ()
   -> IO ()
 -- command_ prog = void $ initialState >>= runCommanderT (run prog)
 command_ prog = exitWith . maybe (ExitFailure 1) (const ExitSuccess) =<< command prog =<< getArgs
 
 -- | This is a combinator which runs a 'ProgramT' with the options,
 -- arguments, and flags with the arguments passed in as strings.
--- It returns 'Just' the output of the program upon successful 
+-- It returns 'Just' the output of the program upon successful
 -- option and argument parsing and returning 'Nothing' otherwise.
 command
   :: forall p a
-   . HasProgram p 
-  => ProgramT p IO a 
+   . HasProgram p
+  => ProgramT p IO a
   -> [String]
   -> IO (Maybe a)
 command prog = runCommanderT (run prog) . fmap pack
@@ -53,8 +53,8 @@ command prog = runCommanderT (run prog) . fmap pack
 -- | Like `command` but takes Text arguments
 command'
   :: forall p a
-   . HasProgram p 
-  => ProgramT p IO a 
+   . HasProgram p
+  => ProgramT p IO a
   -> [Text]
   -> IO (Maybe a)
 command' = runCommanderT . run
