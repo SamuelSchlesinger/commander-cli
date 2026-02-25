@@ -1,0 +1,45 @@
+name: Haskell CI
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+  pull_request:
+    branches: [ "dev", "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc-version: ['9.6.7', '9.8.4', '9.10.1']
+
+    name: GHC ${{ matrix.ghc-version }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: haskell-actions/setup@v2
+      with:
+        ghc-version: ${{ matrix.ghc-version }}
+        cabal-version: '3.14'
+
+    - name: Cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cabal
+        key: ${{ runner.os }}-ghc-${{ matrix.ghc-version }}-${{ hashFiles('**/*.cabal') }}
+        restore-keys: |
+          ${{ runner.os }}-ghc-${{ matrix.ghc-version }}-
+
+    - name: Install dependencies
+      run: |
+        cabal update
+        cabal build --only-dependencies --enable-tests --enable-benchmarks
+    - name: Build
+      run: cabal build --enable-tests --enable-benchmarks all
+    - name: Run tests
+      run: cabal test all
